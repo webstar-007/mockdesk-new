@@ -15,7 +15,6 @@ export default function Instructions() {
   const segs = mock.segments || config.segments.filter((s) => s.sections.some((k) => mock.sections.find((x) => x.key === k))); const cfgOf = (k) => mock.cfg?.[k] || config.sections[k];
   return (
     <div className="instr">
-      <Link to="/" className="back">← Dashboard</Link>
       <header className="in-hero">
         <div>
           <span className={`diff d-${mock.difficulty}`}>{mock.difficulty}</span>{mock.kind === 'pyq' && <span className="badge b-pyq">Previous-year paper{mock.paperYear ? ` · ${mock.paperYear}` : ''}</span>}{mock.live && <span className={`badge b-live l-${mock.live.state}`}>Live mock</span>}

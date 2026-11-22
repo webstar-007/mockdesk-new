@@ -131,7 +131,7 @@ export default function Toolkit() {
   if (!ok) return <p role="status" className="muted">Loading…</p>;
   return (
     <div className="tk">
-      <header className="tk-hero"><h1>Exam toolkit</h1><p>Small tools for the real exam: check your score against the answer key, plan your time per section, decide when to guess and get ready for exam day.</p><Link to="/" className="back">← Dashboard</Link></header>
+      <header className="tk-hero"><h1>Exam toolkit</h1><p>Small tools for the real exam: check your score against the answer key, plan your time per section, decide when to guess and get ready for exam day.</p></header>
       <div className="tk-grid">
         <ScoreCalc config={config} />
         <PacePlanner config={config} />

@@ -10,7 +10,6 @@ export default function FixLog() {
   useEffect(() => { api.get('/fixes').then(setD).catch((e) => setErr(e.message)); }, []);
   return (
     <div className="fixlog">
-      <Link to="/" className="back">← Dashboard</Link>
       <div className="pagehead"><div><h1>Corrections</h1><p className="muted">When we find a wrong answer key, we fix it, re-score every affected attempt and list it here. Report a question from the review page if you spot one.</p></div></div>
       {err && <div className="alert" role="alert">{err}</div>}
       {!d ? <p className="muted" role="status">Loading…</p> : !d.fixes.length ? <div className="card empty"><h2>No corrections yet</h2><p className="muted">Any fix to an answer key will appear here.</p></div> : (

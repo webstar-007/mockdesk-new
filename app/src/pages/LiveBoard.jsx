@@ -11,7 +11,6 @@ export default function LiveBoard() {
   if (!d) return <p className="muted" role="status">Loading…</p>;
   return (
     <div className="lv">
-      <Link to="/" className="back">← Dashboard</Link>
       <div className="pagehead"><div><h1>{d.name}</h1><p className="muted">Live mock · {d.state === 'upcoming' ? `opens ${fmtDateTime(d.opensAt)}` : d.state === 'open' ? `open until ${fmtDateTime(d.closesAt)}` : `closed ${fmtDateTime(d.closesAt)}`}</p></div>{d.state === 'open' && <Link className="btn btn-primary" to={`/mock/${mockId}`}>{d.mine ? 'View result' : 'Start the test'}</Link>}</div>
       <section className="card lv-info">
         <p>Start any time between {fmtDateTime(d.opensAt)} and {fmtDateTime(d.closesAt)}. Everyone takes the same paper, but you do not need to start together. Your <b>first finished attempt</b> inside the window counts for rank. Ranks appear once the window closes.</p>

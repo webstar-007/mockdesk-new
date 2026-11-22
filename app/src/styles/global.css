@@ -139,3 +139,20 @@ p.muted[role=status]{animation:pulse 1.2s ease-in-out infinite}
 .alert{animation:pg-in .2s ease-out both}
 ::selection{background:var(--brand-soft)}
 @media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}.shell,.modal,.modal-back,.alert{animation:none!important}.mock:hover{transform:none}}
+
+/* Back / forward and breadcrumbs (all consoles) */
+.pn{display:flex;align-items:center;gap:12px;margin:0 0 14px;min-width:0}
+.pn-btns{display:inline-flex;flex:none;border:1px solid var(--line);border-radius:12px;background:var(--surface);overflow:hidden}
+.pn-btns button{display:grid;place-items:center;width:40px;height:36px;border:0;background:none;color:var(--ink);cursor:pointer}
+.pn-btns button+button{border-left:1px solid var(--line)}
+.pn-btns button:hover:not(:disabled){background:var(--brand-soft);color:var(--brand)}
+.pn-btns button:disabled{opacity:.35;cursor:default}
+.pn-btns svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.pn nav{min-width:0;overflow:hidden}
+.pn-trail{display:flex;align-items:center;gap:0;list-style:none;margin:0;padding:0;font-size:.92rem;white-space:nowrap;overflow-x:auto;scrollbar-width:none}
+.pn-trail::-webkit-scrollbar{display:none}
+.pn-trail li{display:flex;align-items:center;color:var(--muted)}
+.pn-trail li+li::before{content:"/";margin:0 8px;color:var(--line)}
+.pn-trail a{color:var(--muted);text-decoration:none;font-weight:600}.pn-trail a:hover{color:var(--brand);text-decoration:underline}
+.pn-trail li[aria-current]{color:var(--ink);font-weight:700}
+.ad-main>.pn{margin-top:4px}

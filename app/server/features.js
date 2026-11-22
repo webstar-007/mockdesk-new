@@ -334,7 +334,7 @@ export function makeFeatures({ db, now, settings, notifier, getMock, readResult,
       const att = attemptsOf([m.id]); const topics = new Map(); let plain = null;
       const list = att.map((r) => { const res2 = readResult(r); const s = res2.summary; for (const x of res2.topics) { if (x.qualifying) continue; const k = `${x.section}:${x.topic}`; const o = topics.get(k) || { section: x.section, topic: x.topic, total: 0, correct: 0 }; o.total += x.total; o.correct += x.correct; topics.set(k, o); } return { id: r.id, mock: mockName(r.mock_id), at: r.submitted_at, score: s.score, max: s.maxMarks, pct: s.percentage, accuracy: s.accuracy, attempted: s.attempted }; });
       if (att.length) { const last = att[att.length - 1]; const prev = att.length > 1 ? readResult(att[att.length - 2]).summary : null; plain = plainSummary(readResult(last), { prev, target: db.prepare('SELECT target_score FROM users WHERE id=?').get(m.id)?.target_score }); }
-      res.json({ student: { id: m.id, name: m.name, contact: m.email || m.phone || '', joinedAt: m.joined_at }, attempts: list.reverse(), topics: [...topics.values()].map((x) => ({ ...x, pct: pct(x.correct, x.total) })).sort((a, b) => a.pct - b.pct), plain });
+      res.json({ batch: { id: b.id, name: b.name }, student: { id: m.id, name: m.name, contact: m.email || m.phone || '', joinedAt: m.joined_at }, attempts: list.reverse(), topics: [...topics.values()].map((x) => ({ ...x, pct: pct(x.correct, x.total) })).sort((a, b) => a.pct - b.pct), plain });
     });
     api.get('/teacher/batches/:id/export.csv', guard, (req, res) => {
       const b = batchOf(req); if (!b) return res.status(404).json({ error: 'Batch not found' });

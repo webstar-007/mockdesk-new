@@ -1,9 +1,10 @@
 import { useSite } from '../lib/site.js';
 import { useEffect, useState } from 'react';
-import { Link, Navigate, Route, Routes, useParams } from 'react-router-dom';
+import { Link, Navigate, Route, Routes, useLocation, useParams } from 'react-router-dom';
 import { api } from '../lib/api.js';
 import { useAuth } from '../lib/auth.jsx';
 import ThemeToggle from '../components/ThemeToggle.jsx';
+import PageNav, { teacherTrail, useCrumb } from '../components/PageNav.jsx';
 
 const ago = (ms) => { if (!ms) return 'never'; const d = Math.floor((Date.now() - ms) / 86400000); return d < 1 ? 'today' : d === 1 ? 'yesterday' : `${d} days ago`; };
 const useGet = (url) => { const [s, set] = useState({ data: null, err: '' }); useEffect(() => { set({ data: null, err: '' }); api.get(url).then((data) => set({ data, err: '' })).catch((e) => set({ data: null, err: e.message })); }, [url]); return s; };
@@ -67,7 +68,8 @@ function Batches() {
 
 function Batch() {
   const { id } = useParams(); const { data, err } = useGet(`/teacher/batches/${id}`); const [q, setQ] = useState(''); const [sort, setSort] = useState('name'); const [view, setView] = useState('all');
-  if (err) return <><Link to="/teacher" className="back">← Dashboard</Link><p className="alert" role="alert">{err}</p></>;
+  if (err) return <><p className="alert" role="alert">{err}</p></>;
+  useCrumb(`/teacher/${id}`, data?.batch.name);
   if (!data) return <Loading />;
   const all = data.students; const withM = all.filter((s) => s.mocks);
   const avgAll = withM.length ? Math.round((withM.reduce((a, s) => a + s.avgPct, 0) / withM.length) * 10) / 10 : 0;
@@ -77,7 +79,7 @@ function Batch() {
   const rows = filt.filter((s) => s.name.toLowerCase().includes(q.toLowerCase())).sort((a, b) => (sort === 'name' ? a.name.localeCompare(b.name) : sort === 'avg' ? b.avgPct - a.avgPct : sort === 'low' ? a.avgPct - b.avgPct : (b.lastActive || 0) - (a.lastActive || 0)));
   const dmax = Math.max(1, ...data.dist); const bands = ['0–20', '20–40', '40–60', '60–80', '80–100'];
   return (<div className="tc-page">
-    <Link to="/teacher" className="back">← Dashboard</Link>
+    
     <div className="tc-hello"><div><h1>{data.batch.name}</h1><p className="muted">Join code <code>{data.batch.code}</code></p></div><a className="btn btn-ghost" href={`/api/teacher/batches/${id}/export.csv`}>Download CSV</a></div>
     <div className="tc-stats">
       <Stat label="Students" value={all.length} sub={`${withM.length} have taken a mock`} />
@@ -122,14 +124,15 @@ function Notes({ uid, attempts }) {
 
 function Student() {
   const { id, uid } = useParams(); const { data, err } = useGet(`/teacher/batches/${id}/students/${uid}`);
-  if (err) return <><Link to={`/teacher/${id}`} className="back">← Batch</Link><p className="alert" role="alert">{err}</p></>;
+  if (err) return <><p className="alert" role="alert">{err}</p></>;
+  useCrumb(`/teacher/${id}`, data?.batch?.name); useCrumb(`/teacher/${id}/${uid}`, data?.student.name);
   if (!data) return <Loading />;
   const at = [...data.attempts].reverse(); const series = at.map((a) => a.pct); const n = at.length;
   const avgP = n ? Math.round((series.reduce((a, b) => a + b, 0) / n) * 10) / 10 : 0; const bestP = n ? Math.max(...series) : 0;
   const delta = n > 1 ? Math.round((series[n - 1] - series[0]) * 10) / 10 : null; const accAvg = n ? Math.round(at.reduce((a, b) => a + b.accuracy, 0) / n) : 0;
   const weak = data.topics.slice(0, 3);
   return (<div className="tc-page">
-    <Link to={`/teacher/${id}`} className="back">← Batch</Link>
+    
     <div className="tc-hello tc-prof"><Avatar name={data.student.name} size={56} /><div><h1>{data.student.name}</h1><p className="muted">{data.student.contact}{data.student.joinedAt ? ` · joined ${new Date(data.student.joinedAt).toLocaleDateString()}` : ''}</p></div></div>
     <div className="tc-stats">
       <Stat label="Mocks finished" value={n} />
@@ -150,6 +153,8 @@ function Student() {
   </div>);
 }
 
+const TeacherNav = () => { const t = teacherTrail(useLocation().pathname); return t ? <PageNav trail={t} home="/teacher" /> : null; };
+
 export default function TeacherApp() {
   const site = useSite();
   const { user, logout } = useAuth();
@@ -157,7 +162,7 @@ export default function TeacherApp() {
   return (
     <div className="tc">
       <header className="topbar"><div className="topbar-in"><Link to="/teacher" className="brand"><span className="brand-mark" aria-hidden="true">✓</span><span>{site.name} <small className="muted">Teacher</small></span></Link><div className="topbar-user"><ThemeToggle /><span className="who">{user.name}</span><button className="btn btn-ghost btn-sm" onClick={logout}>Sign out</button></div></div></header>
-      <main className="shell" id="main"><Routes><Route index element={<Batches />} /><Route path=":id" element={<Batch />} /><Route path=":id/:uid" element={<Student />} /><Route path="*" element={<Navigate to="/teacher" replace />} /></Routes></main>
+      <main className="shell" id="main"><TeacherNav /><Routes><Route index element={<Batches />} /><Route path=":id" element={<Batch />} /><Route path=":id/:uid" element={<Student />} /><Route path="*" element={<Navigate to="/teacher" replace />} /></Routes></main>
     </div>
   );
 }

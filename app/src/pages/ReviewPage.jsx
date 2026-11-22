@@ -65,7 +65,6 @@ export default function ReviewPage() {
   const stats = { wrong: d.questions.filter((x) => x.status === 'incorrect').length, saved: Object.values(saved).filter(Boolean).length };
   return (
     <div className="review">
-      <Link to={`/results/${attemptId}`} className="back">← Back to analysis</Link>
       <div className="pagehead"><div><h1>Review questions</h1><p className="muted small">{d.attempt.mockName} · {stats.wrong} incorrect · {stats.saved} bookmarked. Use ← → (or J / K) to move between questions.</p></div></div>
       <div className="filters" role="toolbar" aria-label="Filter questions">
         <div className="chips">{FILTERS.map(([k, l]) => <button key={k} className={`chip ${filter === k ? 'on' : ''}`} aria-pressed={filter === k} onClick={() => set('filter', k)}>{l} <span>{count(k)}</span></button>)}</div>

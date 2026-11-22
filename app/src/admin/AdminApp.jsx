@@ -1,4 +1,5 @@
 import { lazy, Suspense, useEffect, useState } from 'react';
+import PageNav from '../components/PageNav.jsx';
 import { Link, Navigate, NavLink, Route, Routes, useLocation } from 'react-router-dom';
 import { useAuth } from '../lib/auth.jsx';
 import { api } from '../lib/api.js';
@@ -55,6 +56,16 @@ const HUBS = [
   { id: 'settings', label: 'Settings', icon: '⚙', tabs: [['settings', 'Settings']] },
 ];
 
+function AdminNav({ hubs }) {
+  const loc = useLocation(); const parts = loc.pathname.replace(/^\/admin\/?/, '').split('/').filter(Boolean); if (!parts.length) return null;
+  const hub = hubs.find((h) => h.tabs.some(([k]) => k === parts[0])); const tab = hub?.tabs.find(([k]) => k === parts[0]);
+  const trail = [['Dashboard', '/admin']];
+  if (hub && hub.tabs.length > 1) trail.push([hub.label, `/admin/${hub.tabs[0][0]}`]);
+  trail.push([tab ? tab[1] : 'Page', `/admin/${parts[0]}`]);
+  if (parts.length > 1) trail.push([parts[2] === 'preview' ? 'Student preview' : 'Details', loc.pathname]);
+  return <PageNav trail={trail} home="/admin" />;
+}
+
 function HubTabs({ tabs, open }) {
   const loc = useLocation(); const seg = loc.pathname.replace(/^\/admin\/?/, '').replace(/\/$/, '');
   if (tabs.length < 2 || !tabs.some(([k]) => k === seg)) return null; // detail pages keep their own back links
@@ -84,6 +95,7 @@ export default function AdminApp() {
       </aside>
       <main className="ad-main" id="main">
         <div className="ad-top"><button className="ad-find" onClick={() => setFind(true)} aria-label="Search everything"><span aria-hidden="true">🔍</span><span className="ad-find-t">Search users, mocks, questions…</span><kbd>Ctrl K</kbd></button><span style={{ display: 'flex', gap: 10, alignItems: 'center' }}><ThemeToggle /><button className="btn btn-ghost btn-sm ad-out" onClick={logout}>Sign out</button></span></div>
+        <AdminNav hubs={hubs} />
         <HubTabs tabs={(hubs.find(hubOf) || { tabs: [] }).tabs} open={open} />
         <Suspense fallback={<Loading />}>
           <Routes>

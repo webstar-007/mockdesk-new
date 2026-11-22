@@ -32,7 +32,6 @@ export default function ResultPage() {
   const mmss = (x) => duration(Math.round(x));
   return (
     <div className="result">
-      <Link to="/" className="back">← Dashboard</Link>
       <div className="pagehead"><div><h1>{d.attempt.mockName}: your analysis</h1><p className="muted">Submitted {fmtDateTime(d.attempt.submittedAt)}{d.attempt.autoSubmitted ? ' · auto-submitted when time ran out' : ''}</p></div>
         <div className="head-actions"><button type="button" className="btn btn-share" onClick={() => setShare(true)}>Share score</button><Link className="btn btn-primary" to={`/review/${attemptId}`}>Review all questions</Link><Link className="btn btn-ghost" to={`/review/${attemptId}?filter=incorrect`}>Review mistakes</Link><PdfMenu id={attemptId} /></div></div>
 

@@ -5,6 +5,7 @@ import Header from './components/Header.jsx';
 import TipLayer from './components/Tip.jsx';
 import AnnouncementBar from './components/AnnouncementBar.jsx';
 import { useSite } from './lib/site.js';
+import PageNav, { studentTrail } from './components/PageNav.jsx';
 
 const Landing = lazy(() => import('./pages/Landing.jsx'));
 const AuthPage = lazy(() => import('./pages/AuthPage.jsx'));
@@ -36,7 +37,8 @@ function Guard() {
   return <Outlet />;
 }
 const SoftNotice = () => { const s = useSite(); return s.maintenance === 'soft' ? <div className="maint-bar" role="status">{s.maintenanceMessage || 'Tests are paused for a short while. You can still look at your results.'}</div> : null; };
-const Shell = ({ children }) => (<><a className="skip" href="#main">Skip to content</a><Header /><SoftNotice /><AnnouncementBar /><div className="shell" id="main">{children ?? <Outlet />}<footer className="site-foot"><span><b>MockDesk</b> · Online mock tests for government exams</span><span><Link to="/">Dashboard</Link><Link to="/profile">Profile</Link></span></footer></div></>);
+const StudentNav = () => { const t = studentTrail(useLocation().pathname); return t ? <PageNav trail={t} home="/" /> : null; };
+const Shell = ({ children }) => (<><a className="skip" href="#main">Skip to content</a><Header /><SoftNotice /><AnnouncementBar /><div className="shell" id="main"><StudentNav />{children ?? <Outlet />}<footer className="site-foot"><span><b>MockDesk</b> · Online mock tests for government exams</span><span><Link to="/">Dashboard</Link><Link to="/profile">Profile</Link></span></footer></div></>);
 
 // "/" is public: visitors see the landing page, signed-in students see their dashboard.
 function Root() {
