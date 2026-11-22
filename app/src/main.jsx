@@ -7,6 +7,7 @@ import './styles/exam.css';
 import './styles/analysis.css';
 import './styles/home.css';
 import './styles/dash2.css';
+import './styles/teacher.css';
 import './styles/auth.css';
 import './styles/profile.css';
 import './styles/toolkit.css';

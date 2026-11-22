@@ -64,7 +64,7 @@ Downloads the result, analysis and solutions of a submitted attempt as a PDF (`C
 
 ## v7 additions
 Student: `GET /referral`, `GET /announcements`, `POST /announcements/:id/dismiss|click`, `GET /inbox`, `POST /inbox/read`, `GET|PATCH /notifications/prefs`, `GET /push/key`, `POST /push/subscribe|unsubscribe`, `GET /practice/overview`, `POST /practice {size, dryRun}`, `POST /batches/join {code}`, `GET /my/batches`, `POST /batches/:id/leave`. Public: `GET /unsubscribe?u&t`. `POST /auth/register` and `/auth/otp/verify` accept `ref`.
-Teacher: `GET /teacher/batches`, `/teacher/batches/:id`, `/teacher/batches/:id/students/:uid`, `/teacher/batches/:id/export.csv`.
+Teacher: `GET /teacher/overview` (totals, attention, top, recent, activity, weakTopics, batches), `GET /teacher/batches`, `/teacher/batches/:id`, `/teacher/batches/:id/students/:uid`, `/teacher/batches/:id/export.csv`.
 Admin: `/admin/announcements` (CRUD, `/audience`, `/:id/end`, `/:id/duplicate`), `/admin/notifications` (`GET`, `PUT /config`, `POST /run`, `POST /test`), `/admin/referrals` (`GET`, `PUT /settings`), `/admin/batches` (CRUD, teachers, students), `/admin/quality`.
 
 ## Notebook, live windows and exams

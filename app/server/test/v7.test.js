@@ -130,6 +130,9 @@ test('batches: teacher sees only their own students', async () => {
   const ana = (await call('admin', 'GET', `/admin/batches/${other.body.id}`)).body.students[0];
   assert.equal((await call('tina', 'GET', `/teacher/batches/${b.body.id}/students/${ana.id}`)).status, 404);
   const csv = await call('tina', 'GET', `/teacher/batches/${b.body.id}/export.csv`); assert.match(csv.body, /Name,Contact/);
+  const ov = (await call('tina', 'GET', '/teacher/overview')).body; assert.equal(ov.totals.batches, 1); assert.equal(ov.totals.students, 1); assert.equal(ov.activity.length, 14); assert.ok(Array.isArray(ov.attention) && Array.isArray(ov.top) && Array.isArray(ov.recent));
+  assert.equal(det.body.activity.length, 14); assert.equal(det.body.dist.length, 5); assert.ok(Array.isArray(det.body.students[0].series));
+  assert.equal((await call('ben', 'GET', '/teacher/overview')).status, 403);
   assert.equal((await call('tina', 'GET', '/mocks')).status, 403);
   assert.equal((await call('tina', 'GET', '/admin/overview')).status, 403);
   assert.equal((await call('ben', 'GET', '/teacher/batches')).status, 403);

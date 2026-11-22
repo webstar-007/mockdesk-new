@@ -304,13 +304,29 @@ export function makeFeatures({ db, now, settings, notifier, getMock, readResult,
         const pm = perMock.get(r.mock_id) || { n: 0, p: [] }; pm.n++; pm.p.push(s.percentage); perMock.set(r.mock_id, pm);
         for (const x of res.topics) { if (x.qualifying) continue; const k = `${x.section}:${x.topic}`; const o = topics.get(k) || { section: x.section, topic: x.topic, total: 0, correct: 0 }; o.total += x.total; o.correct += x.correct; topics.set(k, o); }
       }
-      const students = ms.map((m) => { const a = by.get(m.id) || []; const last = a[a.length - 1]; const first = a[0]; return { id: m.id, name: m.name, contact: m.email || m.phone || '', joinedAt: m.joined_at, lastActive: m.last_seen || last?.at || null, mocks: a.length, avgPct: avg(a.map((x) => x.pct)), lastPct: last?.pct ?? null, trend: a.length > 1 ? Math.round((last.pct - first.pct) * 10) / 10 : null, inactive: !(m.last_seen && t - m.last_seen < 7 * DAY) && !(last && t - last.at < 7 * DAY) }; });
-      return { students, perMock: [...perMock.entries()].map(([id, v]) => ({ mockId: id, name: mockName(id), finished: v.n, avgPct: avg(v.p) })), weakTopics: [...topics.values()].filter((x) => x.total >= 6).map((x) => ({ ...x, pct: pct(x.correct, x.total) })).sort((a, b) => a.pct - b.pct).slice(0, 8), by };
+      const students = ms.map((m) => { const a = by.get(m.id) || []; const last = a[a.length - 1]; const first = a[0]; return { id: m.id, name: m.name, contact: m.email || m.phone || '', joinedAt: m.joined_at, lastActive: m.last_seen || last?.at || null, mocks: a.length, avgPct: avg(a.map((x) => x.pct)), lastPct: last?.pct ?? null, series: a.slice(-8).map((x) => x.pct), trend: a.length > 1 ? Math.round((last.pct - first.pct) * 10) / 10 : null, inactive: !(m.last_seen && t - m.last_seen < 7 * DAY) && !(last && t - last.at < 7 * DAY) }; });
+      const nameOf = new Map(ms.map((m) => [m.id, m.name])); const day0 = new Date(t).setHours(0, 0, 0, 0);
+      const activity = Array.from({ length: 14 }, (_, i) => ({ day: day0 - (13 - i) * DAY, n: 0 })); for (const r of att) { const i = 13 - Math.floor((day0 + DAY - 1 - r.submitted_at) / DAY); if (i >= 0 && i < 14) activity[i].n++; }
+      const recent = att.slice(-6).reverse().map((r) => { const s2 = readResult(r).summary; return { id: r.id, uid: r.user_id, student: nameOf.get(r.user_id), mock: mockName(r.mock_id), at: r.submitted_at, pct: s2.percentage }; });
+      const dist = [0, 0, 0, 0, 0]; for (const x of students) if (x.mocks) dist[Math.min(4, Math.floor(x.avgPct / 20))]++;
+      return { activity, recent, dist, students, perMock: [...perMock.entries()].map(([id, v]) => ({ mockId: id, name: mockName(id), finished: v.n, avgPct: avg(v.p) })), weakTopics: [...topics.values()].filter((x) => x.total >= 6).map((x) => ({ ...x, pct: pct(x.correct, x.total) })).sort((a, b) => a.pct - b.pct).slice(0, 8), by };
     }
     api.get('/teacher/batches', guard, (req, res) => res.json({ batches: mine(req).map((b) => { const s = summarise(b); return { id: b.id, name: b.name, code: b.code, students: s.students.length, avgPct: avg(s.students.filter((x) => x.mocks).map((x) => x.avgPct)), active7: s.students.filter((x) => !x.inactive).length }; }) }));
+    api.get('/teacher/overview', guard, (req, res) => {
+      const bs = mine(req).map((b) => ({ b, s: summarise(b) })); const all = [];
+      for (const { b, s } of bs) for (const x of s.students) all.push({ ...x, batchId: b.id, batch: b.name });
+      const withMocks = all.filter((x) => x.mocks); const t = now();
+      const attention = all.filter((x) => x.inactive || (x.mocks && x.avgPct < 40) || (x.trend != null && x.trend <= -8)).map((x) => ({ id: x.id, name: x.name, batchId: x.batchId, batch: x.batch, reason: !x.mocks ? 'Has not taken a mock' : x.inactive ? `Inactive ${x.lastActive ? Math.floor((t - x.lastActive) / DAY) + ' days' : 'for a while'}` : x.trend <= -8 ? `Down ${Math.abs(x.trend)}% since first mock` : `Average ${x.avgPct}%`, tone: x.inactive || !x.mocks ? 'idle' : 'low', avgPct: x.avgPct })).slice(0, 8);
+      const top = [...withMocks].sort((a, b) => b.avgPct - a.avgPct).slice(0, 5).map((x) => ({ id: x.id, name: x.name, batchId: x.batchId, batch: x.batch, avgPct: x.avgPct, mocks: x.mocks }));
+      const activity = Array.from({ length: 14 }, (_, i) => ({ day: bs[0]?.s.activity[i].day, n: bs.reduce((a, y) => a + y.s.activity[i].n, 0) }));
+      const recent = bs.flatMap(({ b, s }) => s.recent.map((r) => ({ ...r, batchId: b.id, batch: b.name }))).sort((a, b) => b.at - a.at).slice(0, 8);
+      const topics = new Map(); for (const { s } of bs) for (const w of s.weakTopics) { const k = w.section + ':' + w.topic; const o = topics.get(k) || { ...w, correct: 0, total: 0 }; o.correct = (o.correct || 0) + (w.correct || 0); o.total += w.total; topics.set(k, o); }
+      const weakTopics = [...topics.values()].map((x) => ({ topic: x.topic, section: x.section, total: x.total, pct: x.correct != null && x.total ? pct(x.correct, x.total) : x.pct })).sort((a, b) => a.pct - b.pct).slice(0, 6);
+      res.json({ teacher: { name: req.user.name }, totals: { batches: bs.length, students: all.length, active7: all.filter((x) => !x.inactive).length, avgPct: avg(withMocks.map((x) => x.avgPct)), submissions14: activity.reduce((a, y) => a + y.n, 0) }, batches: bs.map(({ b, s }) => ({ id: b.id, name: b.name, code: b.code, students: s.students.length, avgPct: avg(s.students.filter((x) => x.mocks).map((x) => x.avgPct)), active7: s.students.filter((x) => !x.inactive).length, needs: s.students.filter((x) => x.inactive).length, activity: s.activity.map((a) => a.n) })), attention, top, activity, recent, weakTopics });
+    });
     api.get('/teacher/batches/:id', guard, (req, res) => {
       const b = batchOf(req); if (!b) return res.status(404).json({ error: 'Batch not found' });
-      const s = summarise(b); res.json({ batch: { id: b.id, name: b.name, code: b.code }, students: s.students, perMock: s.perMock, weakTopics: s.weakTopics });
+      const s = summarise(b); res.json({ batch: { id: b.id, name: b.name, code: b.code }, students: s.students, perMock: s.perMock, weakTopics: s.weakTopics, activity: s.activity, recent: s.recent, dist: s.dist });
     });
     api.get('/teacher/batches/:id/students/:uid', guard, (req, res) => {
       const b = batchOf(req); if (!b) return res.status(404).json({ error: 'Batch not found' });
