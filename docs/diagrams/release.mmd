@@ -1,0 +1,9 @@
+flowchart LR
+  A["New code arrives"] --> B["Unpack into a NEW folder<br/>releases/b12-2026..."]
+  B --> C["npm ci and build"]
+  C --> D{"Build worked?"}
+  D -- no --> E(["Stop. The old version<br/>keeps running"])
+  D -- yes --> F["Switch 'current' to the new folder"]
+  F --> G["Restart the service"]
+  G --> H["Health check"]
+  H --> I(["Live. Last 3 releases kept.<br/>Database never touched"])

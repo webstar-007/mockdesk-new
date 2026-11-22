@@ -1,0 +1,11 @@
+# MockDesk administrators
+# Put one email address or mobile number per line. Lines starting with # are ignored.
+# A person gets admin rights the next time they sign in (or sign up) with that email or number.
+# Removing a line does NOT remove rights that were already given: use Admin > Users > Remove admin rights.
+# Admin accounts only see the admin console, so use a different email than your student account.
+#
+# Add the word editor after an email to give content-only rights (mocks, question bank, coverage, reports):
+#   writer@example.com editor
+admin@gmail.com
+# you@example.com
+# +919876543210

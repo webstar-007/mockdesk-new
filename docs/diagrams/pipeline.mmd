@@ -1,0 +1,5 @@
+flowchart TD
+  S(["Build with Parameters"]) --> A{"ACTION?"}
+  A -- deploy --> D1["Get code"] --> D2["Check tools"] --> D3["Pack app"] --> D4["Terraform: build server"] --> D5["Ansible: prepare server"] --> D6["Ansible: release app"] --> D7["Verify: site answers"] --> L(["Site is live"])
+  A -- update --> U1["Get code"] --> U2["Check tools"] --> U3["Pack app"] --> U4["Ansible: release app"] --> U5["Verify: site answers"] --> L
+  A -- destroy --> X1["Terraform: delete everything"] --> X2(["AWS is empty<br/>run check-destroyed.sh"])

@@ -1,0 +1,26 @@
+flowchart LR
+  subgraph YOU["Your laptop"]
+    VS["VS Code and Git"]
+  end
+  GH[("GitHub<br/>this project")]
+  subgraph JK["Jenkins (on your laptop)"]
+    P["Pipeline<br/>deploy / update / destroy"]
+  end
+  subgraph AWS["AWS account"]
+    subgraph VPC["Private network (VPC)"]
+      SG{{"Firewall<br/>port 80 web, port 22 SSH"}}
+      subgraph EC2["One server (Ubuntu)"]
+        APP["MockDesk app<br/>Node.js"]
+        DB[("SQLite database<br/>and uploaded images")]
+        APP --- DB
+      end
+      SG --> EC2
+    end
+    IP(["Fixed public IP"])
+  end
+  USERS["Students<br/>phones and laptops"]
+  VS -- "git push" --> GH
+  GH -- "Jenkins downloads" --> P
+  P -- "Terraform builds" --> AWS
+  P -- "Ansible installs and releases" --> EC2
+  USERS -- "http://IP" --> IP --> SG

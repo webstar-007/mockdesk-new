@@ -1,0 +1,11 @@
+flowchart TB
+  subgraph SERVER["On the server"]
+    R["/opt/mockdesk/releases/<br/>one folder per version (3 kept)"]
+    C["/opt/mockdesk/current<br/>link to the live version"]
+    DATA["/var/lib/mockdesk<br/>mockdesk.db, uploads/, backups/<br/>NEVER touched by an update"]
+    ENV["/etc/mockdesk.env<br/>settings written by Ansible"]
+    SVC["systemd service: mockdesk"]
+  end
+  R --> C --> SVC
+  ENV --> SVC
+  SVC --> DATA

@@ -1,0 +1,91 @@
+import { lazy, Suspense, useEffect } from 'react';
+import { Link, Navigate, Outlet, Route, Routes, useLocation } from 'react-router-dom';
+import { AuthProvider, useAuth } from './lib/auth.jsx';
+import Header from './components/Header.jsx';
+import TipLayer from './components/Tip.jsx';
+import AnnouncementBar from './components/AnnouncementBar.jsx';
+import { useSite } from './lib/site.js';
+
+const Landing = lazy(() => import('./pages/Landing.jsx'));
+const AuthPage = lazy(() => import('./pages/AuthPage.jsx'));
+const Dashboard = lazy(() => import('./pages/Dashboard.jsx'));
+const Instructions = lazy(() => import('./pages/Instructions.jsx'));
+const ExamPage = lazy(() => import('./pages/ExamPage.jsx'));
+const ResultPage = lazy(() => import('./pages/ResultPage.jsx'));
+const ReviewPage = lazy(() => import('./pages/ReviewPage.jsx'));
+const Profile = lazy(() => import('./pages/Profile.jsx'));
+const LiveBoard = lazy(() => import('./pages/LiveBoard.jsx'));
+const Inbox = lazy(() => import('./pages/Inbox.jsx'));
+const Progress = lazy(() => import('./pages/Progress.jsx'));
+const FixLog = lazy(() => import('./pages/FixLog.jsx'));
+const Notebook = lazy(() => import('./pages/Notebook.jsx'));
+const Toolkit = lazy(() => import('./pages/Toolkit.jsx'));
+const AdminApp = lazy(() => import('./admin/AdminApp.jsx'));
+const TeacherApp = lazy(() => import('./teacher/TeacherApp.jsx'));
+
+function Maintenance({ message, logout }) {
+  return <div className="center-page maint" role="alert"><h1>We will be right back</h1><p>{message || 'MockDesk is down for maintenance. Please come back soon.'}</p><button className="btn btn-ghost" onClick={() => window.location.reload()}>Check again</button> <button className="btn btn-ghost" onClick={logout}>Sign out</button></div>;
+}
+function Guard() {
+  const { user, logout } = useAuth(); const loc = useLocation(); const site = useSite();
+  if (site.maintenance === 'hard' && user && !['admin', 'editor'].includes(user.role)) return <Maintenance message={site.maintenanceMessage} logout={logout} />;
+  if (user === undefined) return <div className="center-page" role="status"><span className="spin" aria-hidden="true" />Loading…</div>;
+  if (!user) return <Navigate to="/login" replace state={{ from: loc.pathname }} />;
+  if ((user.role === 'admin' || user.role === 'editor') && !loc.pathname.startsWith('/admin')) return <Navigate to="/admin" replace />;
+  if (user.role === 'teacher' && !loc.pathname.startsWith('/teacher')) return <Navigate to="/teacher" replace />;
+  return <Outlet />;
+}
+const SoftNotice = () => { const s = useSite(); return s.maintenance === 'soft' ? <div className="maint-bar" role="status">{s.maintenanceMessage || 'Tests are paused for a short while. You can still look at your results.'}</div> : null; };
+const Shell = ({ children }) => (<><a className="skip" href="#main">Skip to content</a><Header /><SoftNotice /><AnnouncementBar /><div className="shell" id="main">{children ?? <Outlet />}<footer className="site-foot"><span><b>MockDesk</b> · Online mock tests for government exams</span><span><Link to="/">Dashboard</Link><Link to="/profile">Profile</Link></span></footer></div></>);
+
+// "/" is public: visitors see the landing page, signed-in students see their dashboard.
+function Root() {
+  const { user, logout } = useAuth(); const site = useSite();
+  if (user === undefined) return <div className="center-page" role="status">Loading…</div>;
+  if (!user) return <Landing />;
+  if (user.role === 'admin' || user.role === 'editor') return <Navigate to="/admin" replace />;
+  if (user.role === 'teacher') return <Navigate to="/teacher" replace />;
+  if (site.maintenance === 'hard') return <Maintenance message={site.maintenanceMessage} logout={logout} />;
+  return <Shell><Dashboard /></Shell>;
+}
+
+/** Start each new page at the top, unless the link points at a section on the page. */
+function ScrollTop() {
+  const { pathname, hash } = useLocation();
+  useEffect(() => { if (!hash) window.scrollTo({ top: 0, left: 0, behavior: 'instant' }); }, [pathname, hash]);
+  return null;
+}
+
+export default function App() {
+  return (
+    <AuthProvider>
+      <ScrollTop />
+      <TipLayer />
+      <Suspense fallback={<div className="center-page" role="status">Loading…</div>}>
+        <Routes>
+          <Route path="/" element={<Root />} />
+          <Route path="/login" element={<AuthPage mode="login" />} />
+          <Route path="/register" element={<AuthPage mode="register" />} />
+          <Route path="/p/:token" element={<Progress />} />
+          <Route element={<Guard />}>
+            <Route path="/exam/:attemptId" element={<ExamPage />} />
+            <Route path="/admin/*" element={<AdminApp />} />
+            <Route path="/teacher/*" element={<TeacherApp />} />
+            <Route element={<Shell />}>
+              <Route path="/profile" element={<Profile />} />
+              <Route path="/toolkit" element={<Toolkit />} />
+              <Route path="/notebook" element={<Notebook />} />
+              <Route path="/fixes" element={<FixLog />} />
+              <Route path="/inbox" element={<Inbox />} />
+              <Route path="/live/:mockId" element={<LiveBoard />} />
+              <Route path="/mock/:mockId" element={<Instructions />} />
+              <Route path="/results/:attemptId" element={<ResultPage />} />
+              <Route path="/review/:attemptId" element={<ReviewPage />} />
+            </Route>
+          </Route>
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </Suspense>
+    </AuthProvider>
+  );
+}

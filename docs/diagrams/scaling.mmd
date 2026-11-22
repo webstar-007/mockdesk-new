@@ -1,0 +1,14 @@
+flowchart LR
+  subgraph S1["Stage 1: Test or small batch"]
+    A1["1 small server<br/>t3.small"]
+  end
+  subgraph S2["Stage 2: 1,000 students online"]
+    A2["1 stronger server<br/>c7i.large"]
+    B2["Domain and HTTPS"]
+  end
+  subgraph S3["Stage 3: 5,000 test takers at once"]
+    A3["1 fast server<br/>c7i.xlarge or 2xlarge"]
+    B3["CloudFront in front<br/>for site files"]
+    C3["Backups copied to S3"]
+  end
+  S1 -- "change instance_type, run deploy" --> S2 -- "change instance_type, add CloudFront" --> S3

@@ -1,0 +1,9 @@
+{
+  "files.associations": { "Jenkinsfile": "groovy", "*.tftpl": "plaintext", "*.j2": "jinja" },
+  "files.insertFinalNewline": true,
+  "files.trimTrailingWhitespace": true,
+  "editor.formatOnSave": false,
+  "[terraform]": { "editor.defaultFormatter": "hashicorp.terraform", "editor.formatOnSave": true },
+  "[markdown]": { "editor.wordWrap": "on" },
+  "terraform.experimentalFeatures.validateOnSave": true
+}
