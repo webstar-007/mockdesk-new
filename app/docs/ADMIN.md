@@ -3,7 +3,7 @@
 Open `/admin` while signed in as an admin (an "Admin" link appears in the top bar).
 
 ## Becoming an admin
-- The first admin: put your email or mobile number in `admins.txt`, one per line, before you deploy (or set `MOCKDESK_ADMIN_EMAILS`). Whoever signs up with it becomes an admin.
+- The first admin: `admin@gmail.com` is built in (see `DEFAULT_ADMINS` in `server/lib/admins.js`). Sign up with it, and keep it private until you do. To add others, put an email or mobile number in `admins.txt`, one per line, before you deploy (or set `MOCKDESK_ADMIN_EMAILS`). Whoever signs up with it becomes an admin.
 - After that, manage people in the console: Users > the user > Change role (admin, staff, teacher or student). Staff roles can be limited to the tools you tick.
 - Admins can also change the site name, contact details, limits and time zone in Settings > Site and limits. No file editing is needed.
 
@@ -139,3 +139,27 @@ Staff only see the sections and tabs their access allows. The dashboard's "Needs
 
 ## v15: Student dashboard
 One page, no tabs. A large "next step" card (resume or start the next mock, with progress ring). Below it, the mock cards on the left, and a side column on the right: snapshot (readiness, best score, average, accuracy, target progress), focus topics, this week's streak and recent results. Weak-topic practice sits under the mocks. "Detailed analysis" (skills, study plan, trend, activity, full history), "Exam guide" and the toolkit are one click away. New students see a short "How it works" card instead of empty charts.
+
+
+## v18: Server tools, calendar, support and people tools
+
+All of these are in the admin console. Open **Server** for the tools, **Tests > Calendar** for the calendar, and **Messages > Support inbox** for questions.
+
+**Server > Server tools** (admins only)
+- *Overview.* Uptime, memory, load and the database size. **Restart now** restarts the app (type `restart` to confirm). It works when the app runs under a service manager, which it does on the AWS kit (systemd). If the server is not supervised the button is disabled and explains why; set `MOCKDESK_SUPERVISED=1` for pm2 or Docker.
+- *Database.* Size of each table, free disk space, **Optimise now** (packs the file and refreshes indexes) and **Check for damage** (integrity check).
+- *Logs.* The most recent 1,000 log lines since the last restart. Filter by level, search, refresh automatically, download as a text file. Keys, tokens and passwords are hidden.
+- *What's new.* The version running and what each release changed (from `CHANGELOG.md`).
+- *Restore a backup.* In **Server > Data and backup**, press Restore next to a copy and type `restore`. The copy is checked and staged. It is swapped in the next time the app starts, so press Restart afterwards. The database you had is kept next to it as `mockdesk.db.before-restore-<time>`. Cancel a staged restore from Server tools.
+
+**Tests > Calendar.** A month view of when mocks open, live windows start and end, and when messages and announcements go out, plus the next 14 days and drafts with no opening date. Click an item to edit it. Dates are set on the mock (Available from, Live until).
+
+**Messages > Support inbox.** Students open **Help** in the app and write a question. Staff see it here, reply, add private notes, mark high priority, assign to themselves and close. The student gets the reply in their inbox, by email and as a phone alert if those are on. Students can rate the help after it is closed. Staff need the *Support inbox* permission (the Support preset has it). Switch the whole feature off in Control room > Feature switches.
+
+**On a student's page**
+- *View as student.* Opens the student's own screens in a read-only session (one hour). A banner shows who you are viewing as, and Exit takes you back to your admin session. Nothing you open counts as the student being active, and nothing can be changed. It is recorded in the audit log.
+- *Signed in on.* Every device with its browser, address and sign-in time. Sign out of one device or all of them.
+- *Download their data.* One JSON file with everything held about that person.
+- *Erase their data.* Removes the account and everything linked to it (attempts, notes, bookmarks, messages, support questions, devices, sign-in history). Type their email to confirm. It cannot be undone.
+
+**Students list, bulk actions.** Tick students, then: Suspend, Reactivate, Sign out, Add to batch, Remove from batch, Send message, Set target score or Download list (CSV of the selected rows).

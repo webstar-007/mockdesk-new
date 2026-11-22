@@ -5,12 +5,13 @@ export const PERMS = {
   messages: 'Send messages, announcements and notification settings',
   accounts: 'Add students in bulk and manage batches',
   data: 'Download CSV exports',
+  support: 'Answer student questions in the support inbox',
   contacts: 'See full email addresses and mobile numbers',
 };
 export const PRESETS = [
   { key: 'content', label: 'Content editor', perms: ['content'] },
   { key: 'analyst', label: 'Analyst', perms: ['content', 'students', 'data'] },
-  { key: 'support', label: 'Support', perms: ['content', 'students', 'contacts', 'accounts', 'messages'] },
+  { key: 'support', label: 'Support', perms: ['content', 'students', 'contacts', 'accounts', 'messages', 'support'] },
 ];
 export const cleanPerms = (list) => ['content', ...new Set((Array.isArray(list) ? list : []).filter((p) => p in PERMS && p !== 'content'))];
 export function permsOf(user) {
@@ -28,7 +29,9 @@ export function needFor(method, path) {
   if (CONTENT.test(path)) return 'content';
   if (/^\/(users\.csv|attempts\.csv|export)(\/|$)/.test(path)) return 'data';
   if (/^\/(announcements|messages|notifications)(\/|$)/.test(path) || (method === 'POST' && path === '/cohorts/nudge')) return 'messages';
+  if (/^\/tickets(\/|$)/.test(path)) return 'support';
   if (/^\/students\/import(\/|$)/.test(path)) return 'accounts';
+  if (get && /^\/calendar$/.test(path)) return 'content';
   if (/^\/batches(\/|$)/.test(path)) return get ? 'students' : 'accounts';
   if (/^\/integrity\/[^/]+$/.test(path) && method === 'PATCH') return 'students';
   if (get && /^\/(overview|users|attempts|live|integrity|cohorts|analytics|anomalies|referrals)(\/[^/]+)?$/.test(path)) return 'students';

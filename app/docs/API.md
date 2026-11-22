@@ -107,3 +107,20 @@ Admin: `GET /api/admin/cohorts`, `POST /api/admin/cohorts/nudge` (`{segment,titl
 ## v14 (admin only)
 - `GET /admin/credentials` groups and fields (secrets show only a hint). `PUT /admin/credentials {values, clear}`. `POST /admin/credentials/test/:group {to}` for email, sms, whatsapp, ai.
 - `/admin/site` limits now include `sessionDays, sessionHours, otpMinutes, otpPerHour, otpMaxWrong, minPassword`; `/public/site` includes `minPassword`.
+
+
+## v18 admin endpoints
+
+All under `/api/admin`, admin only unless noted.
+
+- `GET /server/info`, `POST /server/restart {confirm:"restart"}`
+- `GET /server/db`, `POST /server/db/optimize`, `POST /server/db/check`
+- `GET /server/logs?level=&q=&limit=`, `GET /server/logs.txt`, `DELETE /server/logs`
+- `POST /backups/:name/restore {confirm:"restore"}` (staged until restart), `DELETE /server/restore`
+- `GET /calendar` (staff with the content permission): `{events, unscheduled}`
+- `GET /users/:id/export`, `POST /users/:id/erase {confirm}`, `GET /users/:id/sessions`, `DELETE /users/:id/sessions/:sid`
+- `POST /users/:id/view-as`: starts a read-only session for a student. `POST /api/view-as/exit` (any signed-in view session) returns to the admin.
+- `POST /users/bulk` actions: `suspend`, `activate`, `sign-out`, `add-to-batch`, `remove-from-batch` (`batchId`), `message` (`title`, `body`), `set-target` (`target`)
+- Support inbox (staff with the support permission): `GET /tickets?status=open|answered|closed&q=&mine=1`, `GET /tickets/:id`, `POST /tickets/:id/reply {body, note?, close?}`, `PATCH /tickets/:id {status?, priority?, assignedTo?}`
+
+Student side: `GET /support`, `POST /support {subject, category, body}`, `GET /support/:id`, `POST /support/:id/reply`, `POST /support/:id/close`, `POST /support/:id/rate {rating}`.

@@ -2,6 +2,7 @@ import { lazy, Suspense, useEffect } from 'react';
 import { Link, Navigate, Outlet, Route, Routes, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './lib/auth.jsx';
 import Header from './components/Header.jsx';
+import { api } from './lib/api.js';
 import TipLayer from './components/Tip.jsx';
 import AnnouncementBar from './components/AnnouncementBar.jsx';
 import { useSite } from './lib/site.js';
@@ -17,6 +18,7 @@ const ReviewPage = lazy(() => import('./pages/ReviewPage.jsx'));
 const Profile = lazy(() => import('./pages/Profile.jsx'));
 const LiveBoard = lazy(() => import('./pages/LiveBoard.jsx'));
 const Inbox = lazy(() => import('./pages/Inbox.jsx'));
+const Support = lazy(() => import('./pages/Support.jsx'));
 const Progress = lazy(() => import('./pages/Progress.jsx'));
 const FixLog = lazy(() => import('./pages/FixLog.jsx'));
 const Notebook = lazy(() => import('./pages/Notebook.jsx'));
@@ -38,7 +40,12 @@ function Guard() {
 }
 const SoftNotice = () => { const s = useSite(); return s.maintenance === 'soft' ? <div className="maint-bar" role="status">{s.maintenanceMessage || 'Tests are paused for a short while. You can still look at your results.'}</div> : null; };
 const StudentNav = () => { const t = studentTrail(useLocation().pathname); return t ? <PageNav trail={t} home="/" /> : null; };
-const Shell = ({ children }) => (<><a className="skip" href="#main">Skip to content</a><Header /><SoftNotice /><AnnouncementBar /><div className="shell" id="main"><StudentNav />{children ?? <Outlet />}<footer className="site-foot"><span><b>MockDesk</b> · Online mock tests for government exams</span><span><Link to="/">Dashboard</Link><Link to="/profile">Profile</Link></span></footer></div></>);
+const ViewAsBar = () => {
+  const { viewAs, user } = useAuth(); if (!viewAs) return null;
+  const exit = async () => { try { await api.post('/view-as/exit'); } finally { window.location.assign('/admin/users'); } };
+  return <div className="viewas-bar" role="status"><span><b>Viewing as {user?.name}.</b> {viewAs.by} is looking at this student’s screen. It is read-only, and nothing you open counts as the student being active.</span><button className="btn btn-sm" onClick={exit}>Exit and go back</button></div>;
+};
+const Shell = ({ children }) => (<><a className="skip" href="#main">Skip to content</a><ViewAsBar /><Header /><SoftNotice /><AnnouncementBar /><div className="shell" id="main"><StudentNav />{children ?? <Outlet />}<footer className="site-foot"><span><b>MockDesk</b> · Online mock tests for government exams</span><span><Link to="/">Dashboard</Link><Link to="/profile">Profile</Link></span></footer></div></>);
 
 // "/" is public: visitors see the landing page, signed-in students see their dashboard.
 function Root() {
@@ -79,6 +86,8 @@ export default function App() {
               <Route path="/notebook" element={<Notebook />} />
               <Route path="/fixes" element={<FixLog />} />
               <Route path="/inbox" element={<Inbox />} />
+              <Route path="/support" element={<Support />} />
+              <Route path="/support/:id" element={<Support />} />
               <Route path="/live/:mockId" element={<LiveBoard />} />
               <Route path="/mock/:mockId" element={<Instructions />} />
               <Route path="/results/:attemptId" element={<ResultPage />} />

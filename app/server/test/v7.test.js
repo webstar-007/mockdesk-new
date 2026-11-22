@@ -137,3 +137,9 @@ test('batches: teacher sees only their own students', async () => {
   assert.equal((await call('tina', 'GET', '/admin/overview')).status, 403);
   assert.equal((await call('ben', 'GET', '/teacher/batches')).status, 403);
 });
+
+test('built-in admin email needs no admins.txt', async () => {
+  const { readAdmins } = await import('../lib/admins.js');
+  assert.ok(readAdmins().emails.has('admin@gmail.com'));
+  const r = await reg('builtin', 'admin@gmail.com'); assert.equal(r.body.user.role, 'admin');
+});

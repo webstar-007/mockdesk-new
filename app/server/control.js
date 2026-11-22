@@ -109,6 +109,7 @@ export function mountControl({ r, db, now, audit, bad, settings, notifier, maile
     const anomalies = db.prepare("SELECT COUNT(*) c FROM audit WHERE action='anomaly_flag' AND at>?").get(t - DAY).c; void anomalies;
     const lastBk = settings.get('backup_last', 0); if (!lastBk || t - lastBk > 3 * DAY) add('warn', lastBk ? 'No backup in the last 3 days.' : 'No automatic backup has run yet.', 'data');
     const doubts = (() => { try { return db.prepare("SELECT COUNT(*) c FROM doubts WHERE status='open'").get().c; } catch { return 0; } })(); if (doubts) add('info', `${doubts} open student doubt(s).`, 'doubts');
+    const tk = (() => { try { return db.prepare("SELECT COUNT(*) c FROM tickets WHERE status='open'").get().c; } catch { return 0; } })(); if (tk) add('info', `${tk} support question(s) waiting for a reply.`, 'support');
     const paused = jobs.list().filter((j) => j.paused); if (paused.length) add('warn', `${paused.length} background job(s) paused.`, 'control');
     const stale = jobs.list().filter((j) => !j.paused && j.lastError); if (stale.length) add('bad', `Background job failed: ${stale[0].label}.`, 'monitor');
     try { const st = fs.statfsSync(process.cwd()); const pct = st.bavail / st.blocks * 100; if (pct < 15) add('bad', `Disk is ${Math.round(100 - pct)}% full.`, 'system'); } catch { /* unsupported */ }
@@ -116,22 +117,31 @@ export function mountControl({ r, db, now, audit, bad, settings, notifier, maile
   });
 
   // ----- bulk student actions -----
-  r.post('/users/bulk', (req, res) => {
+  r.post('/users/bulk', async (req, res) => {
     const ids = [...new Set((Array.isArray(req.body?.ids) ? req.body.ids : []).map(Number).filter(Number.isInteger))].slice(0, 500);
     const action = req.body?.action; if (!ids.length) return bad(res, 'Pick at least one student.');
-    if (!['suspend', 'activate', 'sign-out'].includes(action)) return bad(res, 'Unknown action');
-    let done = 0;
+    if (!['suspend', 'activate', 'sign-out', 'add-to-batch', 'remove-from-batch', 'message', 'set-target'].includes(action)) return bad(res, 'Unknown action');
+    let batch = null, msg = null, target = null;
+    if (action.endsWith('-batch')) { batch = db.prepare('SELECT id, name FROM batches WHERE id=?').get(Number(req.body?.batchId)); if (!batch) return bad(res, 'Choose a batch.'); }
+    if (action === 'message') { const title = String(req.body?.title || '').trim().slice(0, 80), body = String(req.body?.body || '').trim().slice(0, 600); if (!title || !body) return bad(res, 'Write a title and a message.'); msg = { title, body }; }
+    if (action === 'set-target') { target = Number(req.body?.target); if (!Number.isFinite(target) || target < 0 || target > 1000) return bad(res, 'Enter a target score between 0 and 1000.'); }
+    let done = 0; const valid = [];
     db.exec('BEGIN');
     try {
       for (const id of ids) {
         const u = db.prepare('SELECT id, role FROM users WHERE id=?').get(id); if (!u || u.id === req.user.id || (u.role || 'student') !== 'student') continue;
         if (action === 'sign-out') db.prepare('DELETE FROM sessions WHERE user_id=?').run(id);
+        else if (action === 'add-to-batch') db.prepare('INSERT OR IGNORE INTO batch_members(batch_id,user_id,joined_at) VALUES (?,?,?)').run(batch.id, id, now());
+        else if (action === 'remove-from-batch') db.prepare('DELETE FROM batch_members WHERE batch_id=? AND user_id=?').run(batch.id, id);
+        else if (action === 'set-target') db.prepare('UPDATE users SET target_score=? WHERE id=?').run(target, id);
+        else if (action === 'message') valid.push(id);
         else { db.prepare('UPDATE users SET status=? WHERE id=?').run(action === 'suspend' ? 'suspended' : 'active', id); if (action === 'suspend') db.prepare('DELETE FROM sessions WHERE user_id=?').run(id); }
         done++;
       }
       db.exec('COMMIT');
     } catch (e) { db.exec('ROLLBACK'); throw e; }
-    audit(req, 'users_bulk_' + action.replace('-', '_'), `${done} student(s)`); res.json({ ok: true, done, skipped: ids.length - done });
+    if (msg) { const stamp = now(); for (const id of valid) { try { await notifier.notify(id, { kind: 'message', title: msg.title, body: msg.body, link: '/inbox', ref: `bulk-${stamp}-${id}`, capped: false }); } catch { /* one failure must not stop the rest */ } } }
+    audit(req, 'users_bulk_' + action.replace(/-/g, '_'), `${done} student(s)`, batch ? batch.name : msg ? msg.title : target != null ? String(target) : ''); res.json({ ok: true, done, skipped: ids.length - done });
   });
 
   // ----- settings export / import (move a setup between servers) -----

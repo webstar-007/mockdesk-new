@@ -4,11 +4,12 @@ export const PERMS = [
   ['messages', 'Messages', 'Send messages and announcements, change notification settings'],
   ['accounts', 'Accounts', 'Add students in bulk and manage batches'],
   ['data', 'Data export', 'Download CSV exports'],
+  ['support', 'Support inbox', 'Read and answer student questions'],
   ['contacts', 'Contact details', 'See full email addresses and mobile numbers. Without this they are masked.'],
 ];
-export const PRESETS = [['Content editor', ['content']], ['Analyst', ['content', 'students', 'data']], ['Support', ['content', 'students', 'contacts', 'accounts', 'messages']]];
+export const PRESETS = [['Content editor', ['content']], ['Analyst', ['content', 'students', 'data']], ['Support', ['content', 'students', 'contacts', 'accounts', 'messages', 'support']]];
 // Which permission opens each admin page. Pages not listed here are for admins only.
-export const NAV_PERM = { '': 'students', users: 'students', attempts: 'students', integrity: 'students', anomalies: 'students', cohorts: 'students', live: 'students', analytics: 'students', referrals: 'students', batches: 'students', announcements: 'messages', messages: 'messages', notifications: 'messages', mocks: 'content', bank: 'content', content: 'content', quality: 'content', coverage: 'content', reports: 'content', 'import-students': 'accounts', data: 'data' };
+export const NAV_PERM = { '': 'students', users: 'students', attempts: 'students', integrity: 'students', anomalies: 'students', cohorts: 'students', live: 'students', analytics: 'students', referrals: 'students', batches: 'students', announcements: 'messages', messages: 'messages', notifications: 'messages', mocks: 'content', bank: 'content', content: 'content', quality: 'content', coverage: 'content', reports: 'content', calendar: 'content', support: 'support', 'import-students': 'accounts', data: 'data' };
 export function PermPicker({ value, onChange }) {
   const has = (k) => k === 'content' || value.includes(k);
   const toggle = (k) => onChange(has(k) ? value.filter((x) => x !== k) : [...value, k]);

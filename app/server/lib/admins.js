@@ -4,11 +4,15 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { normEmail, normPhone } from './otp.js';
+// Built-in administrator. This account is always an admin, so no admins.txt is needed. Change it here to use another address.
+// Other admins can still be added from admins.txt, MOCKDESK_ADMIN_EMAILS, or Admin > Users.
+export const DEFAULT_ADMINS = ['admin@gmail.com'];
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 export const adminsFile = () => process.env.MOCKDESK_ADMINS_FILE || path.join(ROOT, 'admins.txt');
 export function readAdmins() {
   const emails = new Set(), phones = new Set(), ignored = [], editorEmails = new Set(), editorPhones = new Set();
   const take = (raw0) => { let raw = raw0.trim(); let editor = false; const m = raw.match(/^(.*?)[\s,;:]+editor$/i) || raw.match(/^editor[\s:]+(.*)$/i); if (m) { raw = m[1].trim(); editor = true; } const v = raw; if (!v) return; if (editor) { if (v.includes('@')) { const e = normEmail(v); e ? editorEmails.add(e) : ignored.push(v); } else { const p = normPhone(v); p ? editorPhones.add(p) : ignored.push(v); } return; } if (v.includes('@')) { const e = normEmail(v); e ? emails.add(e) : ignored.push(v); } else { const p = normPhone(v); p ? phones.add(p) : ignored.push(v); } };
+  DEFAULT_ADMINS.forEach(take);
   String(process.env.MOCKDESK_ADMIN_EMAILS || '').split(',').forEach(take);
   try { for (const line of fs.readFileSync(adminsFile(), 'utf8').split(/\r?\n/)) take(line.replace(/#.*$/, '').trim()); } catch { /* file is optional */ }
   return { emails, phones, ignored, editorEmails, editorPhones };

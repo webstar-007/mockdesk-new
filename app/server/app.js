@@ -30,6 +30,7 @@ import { makeFeatures } from './features.js';
 import { makeExams } from './lib/exams.js';
 import { sectionDef, allSections } from './lib/sections.js';
 import { promoteAdmins } from './lib/admins.js';
+import { mountSupportStudent } from './support.js';
 import { buildResult, upgradeResult } from './lib/scoring.js';
 import { makeSender, normEmail, normPhone, maskId, newCode, hashCode, codeMatches, OTP_TTL_MS, OTP_COOLDOWN_MS, OTP_MAX_PER_HOUR, OTP_MAX_WRONG } from './lib/otp.js';
 
@@ -51,7 +52,7 @@ const INSTRUCTIONS = [
 const hashPw = (pw, salt) => crypto.scryptSync(pw, salt, 64).toString('hex');
 const iso = (ms) => new Date(ms).toISOString();
 
-export function createApp(db, { allowIncomplete = process.env.MOCKDESK_ALLOW_INCOMPLETE === '1', now = () => Date.now(), serveClient = true, otpSender, mailer, whatsapp, drafter, credKeyFile } = {}) {
+export function createApp(db, { allowIncomplete = process.env.MOCKDESK_ALLOW_INCOMPLETE === '1', now = () => Date.now(), serveClient = true, otpSender, mailer, whatsapp, drafter, credKeyFile, exitFn } = {}) {
   const app = express();
   app.use(compression()); // results are about 250 KB of JSON; gzip makes that about 30 KB and cuts the data-transfer bill
   app.use(express.json({ limit: '1mb' }));
@@ -129,14 +130,19 @@ export function createApp(db, { allowIncomplete = process.env.MOCKDESK_ALLOW_INC
   function startSession(res, userId, remember = true) {
     if (res.req) logLogin(res.req, userId, true, db.prepare('SELECT COALESCE(email,phone) w FROM users WHERE id=?').get(userId)?.w);
     const sid = crypto.randomBytes(32).toString('hex'); const L = limitsOf(settings); const ms = remember ? L.sessionDays * 24 * 3600 * 1000 : L.sessionHours * 3600 * 1000;
-    db.prepare('INSERT INTO sessions VALUES (?,?,?)').run(sid, userId, now() + ms);
+    db.prepare('INSERT INTO sessions(id,user_id,expires_at,ip,ua,created_at) VALUES (?,?,?,?,?,?)').run(sid, userId, now() + ms, res.req?.ip || null, String(res.req?.headers?.['user-agent'] || '').slice(0, 160), now());
     res.setHeader('Set-Cookie', `sid=${sid}; HttpOnly; SameSite=Lax; Path=/${remember ? `; Max-Age=${ms / 1000}` : ''}${process.env.NODE_ENV === 'production' ? '; Secure' : ''}`);
   }
   function auth(req, res, next) {
     const sid = cookieOf(req).sid;
-    const row = sid && db.prepare('SELECT u.* , s.expires_at FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.id=?').get(sid);
+    const row = sid && db.prepare('SELECT u.* , s.expires_at, s.view_by FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.id=?').get(sid);
     if (!row || row.expires_at < now()) return res.status(401).json({ error: 'Please sign in' });
     if (row.status === 'suspended') return res.status(403).json({ error: 'This account has been suspended. Contact the administrator.', code: 'SUSPENDED' });
+    if (row.view_by) { // an admin looking at the student's screen: read-only, and it does not count as the student being active
+      req.viewAs = { by: row.view_by }; req.user = row; req.sid = sid;
+      if (!['GET', 'HEAD'].includes(req.method) && !['/view-as/exit', '/auth/logout'].includes(req.path)) return res.status(403).json({ error: 'You are viewing this account as an admin. Changes are switched off. Use Exit to go back.', code: 'VIEW_ONLY' });
+      return next();
+    }
     if (!row.last_seen || now() - row.last_seen > 60000 || row.last_ip !== req.ip) db.prepare('UPDATE users SET last_seen=?, last_ip=? WHERE id=?').run(now(), req.ip || null, row.id);
     req.user = row; req.sid = sid; next();
   }
@@ -295,10 +301,29 @@ export function createApp(db, { allowIncomplete = process.env.MOCKDESK_ALLOW_INC
     if (!c.features.practice && req.path.startsWith('/practice')) return off('practice', 'Practice sets');
     if (!c.features.referrals && req.path.startsWith('/referral')) return off('referrals', 'Invite-a-friend rewards');
     if (!c.features.shareLinks && req.path.startsWith('/share-links')) return off('shareLinks', 'Parent progress links');
+    if (!c.features.support && req.path.startsWith('/support')) return off('support', 'The support inbox');
     if (!c.features.notebook && /^\/(notebook|bookmarks)/.test(req.path)) return off('notebook', 'The mistake notebook');
     return next();
   });
-  api.get('/me', (req, res) => res.json({ user: publicUser(req.user) }));
+  api.get('/me', (req, res) => res.json({ user: publicUser(req.user), viewAs: req.viewAs ? { by: db.prepare('SELECT name FROM users WHERE id=?').get(req.viewAs.by)?.name || 'Admin' } : undefined }));
+  // View as student: a separate, read-only, one-hour session for the student's account. The admin's own session is kept in a second cookie.
+  api.post('/admin/users/:id/view-as', (req, res) => {
+    if (req.viewAs || req.user.role !== 'admin') return res.status(403).json({ error: 'Admin access only' });
+    const u = db.prepare('SELECT * FROM users WHERE id=?').get(Number(req.params.id)); if (!u) return res.status(404).json({ error: 'User not found' });
+    if ((u.role || 'student') !== 'student') return res.status(400).json({ error: 'You can view student accounts only.' });
+    const sid = crypto.randomBytes(32).toString('hex'); db.prepare('INSERT INTO sessions(id,user_id,expires_at,ip,ua,created_at,view_by) VALUES (?,?,?,?,?,?,?)').run(sid, u.id, now() + 3600000, req.ip || null, 'view-as', now(), req.user.id);
+    const sec = process.env.NODE_ENV === 'production' ? '; Secure' : '';
+    res.setHeader('Set-Cookie', [`adm_sid=${req.sid}; HttpOnly; SameSite=Lax; Path=/; Max-Age=3600${sec}`, `sid=${sid}; HttpOnly; SameSite=Lax; Path=/; Max-Age=3600${sec}`]);
+    db.prepare('INSERT INTO audit(at,admin_id,admin_name,action,target,detail) VALUES (?,?,?,?,?,?)').run(now(), req.user.id, req.user.name, 'view_as_start', u.email || u.phone || String(u.id), '');
+    res.json({ ok: true, name: u.name });
+  });
+  api.post('/view-as/exit', (req, res) => {
+    if (!req.viewAs) return res.status(400).json({ error: 'You are not viewing as anyone.' });
+    const back = cookieOf(req).adm_sid; const adm = back && db.prepare("SELECT s.id FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.id=? AND u.id=? AND u.role='admin' AND s.expires_at>?").get(back, req.viewAs.by, now());
+    db.prepare('DELETE FROM sessions WHERE id=?').run(req.sid); const sec = process.env.NODE_ENV === 'production' ? '; Secure' : '';
+    res.setHeader('Set-Cookie', [adm ? `sid=${adm.id}; HttpOnly; SameSite=Lax; Path=/; Max-Age=2592000${sec}` : 'sid=; Path=/; Max-Age=0', 'adm_sid=; Path=/; Max-Age=0']);
+    res.json({ ok: true, signedIn: !!adm });
+  });
   api.patch('/me', (req, res) => {
     const { name, targetScore, examDate } = req.body || {};
     const u = req.user;
@@ -382,8 +407,8 @@ export function createApp(db, { allowIncomplete = process.env.MOCKDESK_ALLOW_INC
   }
 
   // Admin accounts are separate from student accounts: they only use /api/admin.
-  api.use(['/mocks', '/attempts', '/stats', '/questions', '/practice', '/notebook', '/bookmarks', '/referral', '/batches', '/my', '/inbox', '/push', '/announcements', '/notifications', '/errors', '/fixes', '/share-links'], (req, res, next) => (['admin', 'editor', 'teacher'].includes(req.user?.role) ? res.status(403).json({ error: 'This account uses its own console, not the student area', code: 'ADMIN_ONLY' }) : next()));
-  features.mount(api); mountShare(api, { db, now }); features.mountTeacher(api); features2.mount(api); features2.mountTeacher(api);
+  api.use(['/mocks', '/attempts', '/stats', '/questions', '/practice', '/notebook', '/bookmarks', '/referral', '/batches', '/my', '/inbox', '/push', '/announcements', '/notifications', '/errors', '/fixes', '/share-links', '/support'], (req, res, next) => (['admin', 'editor', 'teacher'].includes(req.user?.role) ? res.status(403).json({ error: 'This account uses its own console, not the student area', code: 'ADMIN_ONLY' }) : next()));
+  features.mount(api); mountSupportStudent({ api, db, now, notifier }); mountShare(api, { db, now }); features.mountTeacher(api); features2.mount(api); features2.mountTeacher(api);
   api.get('/mocks', (req, res) => {
     const rows = db.prepare('SELECT * FROM attempts WHERE user_id=? ORDER BY started_at DESC').all(req.user.id);
     for (const r of rows) if (r.status === 'in_progress' && mockOf(r)) expire(r);
@@ -624,7 +649,7 @@ export function createApp(db, { allowIncomplete = process.env.MOCKDESK_ALLOW_INC
   jobs.reg('campaigns', 'Message campaigns', 'every 10 min', () => runCampaigns({ db, notifier, now }));
   jobs.reg('backup', 'Database backup', 'every 10 min (runs when due)', () => { const b = runBackup({ db, now, settings }); return b ? `Saved ${b.name}` : 'Not due yet'; });
   jobs.reg('cleanup', 'Tidy expired sign-ins and codes', 'every 10 min', () => { const t = now(); db.prepare('DELETE FROM sessions WHERE expires_at<?').run(t); db.prepare("DELETE FROM otps WHERE expires_at<? AND expires_at>0").run(t - 86400000); db.prepare('DELETE FROM login_log WHERE at<?').run(t - 90 * 86400000); });
-  api.use('/admin', (req, res, next) => (['admin', 'editor'].includes(req.user.role) ? next() : res.status(403).json({ error: 'Admin access only' })), adminRouter({ drafter, db, now, invalidate, getMock, readResult, hashPw, iso, settings, notifier, features, features2, exams, runReminders: runRem, mailer, jobs, metrics, controls, creds, live, otpSender, whatsapp }));
+  api.use('/admin', (req, res, next) => (['admin', 'editor'].includes(req.user.role) ? next() : res.status(403).json({ error: 'Admin access only' })), adminRouter({ exitFn, drafter, db, now, invalidate, getMock, readResult, hashPw, iso, settings, notifier, features, features2, exams, runReminders: runRem, mailer, jobs, metrics, controls, creds, live, otpSender, whatsapp }));
 
   api.use((req, res) => res.status(404).json({ error: 'Not found' }));
   app.use('/api', api);

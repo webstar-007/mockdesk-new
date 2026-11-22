@@ -8,6 +8,7 @@ It is one Node.js program with a built-in SQLite database. No separate database 
 
 - **Students:** timed mocks with sectional timers and +3 / −1 marking, live-window mocks, practice sets, mistake notebook, bookmarks, PDF reports, share card, reminders, weekly summary, and a read-only progress link for a parent or mentor.
 - **Admins** (`/admin`): users, attempts, mocks, question editor and bank, bulk import from Word or CSV, duplicate finder, AI solution drafts, announcements, messages (in-app, push, email, WhatsApp), copy check, bulk student import, CSV exports, backups, staff permissions, and Settings for the site name, contact, home page text, limits and time zone.
+- **Admin tools (v18):** restart, database tools, restore, log viewer and version info (Server tools); release calendar; support inbox; view as student; per-person data download and erase; more bulk actions. See docs/ADMIN.md.
 - **Navigation:** every student, teacher and admin page (except the live exam) has Back and Forward buttons and a breadcrumb trail. Back goes to the previous page, or to the parent page when the visit started there. Alt + Left and Alt + Right work too.
 - **Teachers** (`/teacher`): dashboard with activity, students who need attention, top performers and weak topics, plus batch and student pages with notes.
 
@@ -23,7 +24,7 @@ npm start
 
 Open http://localhost:3000. Students can tick "Keep me signed in" (60 days; unticked, they are signed out when the browser closes), and the sign-in page remembers their email on that device. Passwords are never stored by the site; browsers offer to save them. Sign-in codes are printed in the terminal while no email or SMS provider is set, and password sign-in always works.
 
-To become the first admin, put your email in `admins.txt` before you sign up with it. After that, manage roles in Admin > Users.
+The built-in admin is `admin@gmail.com` (set in `server/lib/admins.js`): sign up with it and you are the admin, no `admins.txt` needed. More admins can be added from `admins.txt` or Admin > Users. After that, manage roles in Admin > Users.
 
 For front-end work run `npm run dev:server` and `npm run dev:client` in two terminals.
 

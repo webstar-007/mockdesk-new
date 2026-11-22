@@ -14,6 +14,9 @@ import { answerAsk, EXAMPLES } from './lib/ask.js';
 import { mountAdminExtras } from './adminExtras.js';
 import { mountOps } from './ops.js';
 import { mountControl } from './control.js';
+import { mountTools } from './tools.js';
+import { eraseUser } from './lib/userdata.js';
+import { mountSupportAdmin } from './support.js';
 import { mountContent } from './content.js';
 import { matchesFor } from './lib/similar.js';
 import { sectionDef, allSectionKeys, allSections } from './lib/sections.js';
@@ -68,7 +71,7 @@ export function cleanQuestion(body, { partial = false, strictOptions = false } =
   return { section, q, errors };
 }
 
-export function adminRouter({ drafter = null, db, now, invalidate, getMock, readResult, hashPw, settings, notifier, features, features2, runReminders, exams, mailer = null, jobs, metrics, controls, creds, live, otpSender, whatsapp = null }) {
+export function adminRouter({ exitFn, drafter = null, db, now, invalidate, getMock, readResult, hashPw, settings, notifier, features, features2, runReminders, exams, mailer = null, jobs, metrics, controls, creds, live, otpSender, whatsapp = null }) {
   const r = express.Router();
   // Admins can do everything. Staff (role "editor") get the content tools plus whatever permissions an admin ticked for them.
   r.use((req, res, next) => {
@@ -228,7 +231,7 @@ export function adminRouter({ drafter = null, db, now, invalidate, getMock, read
     const u = db.prepare('SELECT * FROM users WHERE id=?').get(req.params.id); if (!u) return bad(res, 'User not found', 404);
     if (u.id === req.user.id) return bad(res, 'You cannot delete your own account');
     if (req.body?.confirm !== (u.email || u.phone)) return bad(res, 'Type the user’s email to confirm deletion', 400, { code: 'CONFIRM' });
-    db.exec('BEGIN'); try { for (const t of ['sessions', 'attempts', 'reports']) db.prepare(`DELETE FROM ${t} WHERE user_id=?`).run(u.id); db.prepare('DELETE FROM users WHERE id=?').run(u.id); db.exec('COMMIT'); } catch (e) { db.exec('ROLLBACK'); throw e; }
+    eraseUser(db, u.id);
     audit(req, 'user_delete', u.email || u.phone, u.name); bust(); res.json({ ok: true });
   });
 
@@ -704,6 +707,8 @@ export function adminRouter({ drafter = null, db, now, invalidate, getMock, read
   mountAdminExtras({ r, db, now, audit, bad, results, settings, notifier, features, runReminders, page });
   mountControl({ r, db, now, audit, bad, settings, notifier, mailer, creds, live, drafter, otpSender, whatsapp, jobs, metrics, controlsCache: controls, recentErrors });
   mountOps({ r, db, now, audit, bad, results, settings, notifier, page });
+  mountTools({ r, db, now, audit, bad, settings, exitFn });
+  mountSupportAdmin({ r, db, now, audit, bad, notifier });
   mountContent({ r, db, now, audit, bad, settings, drafter, cleanQuestion, saveQuestion, qOut });
   r.use((req, res) => res.status(404).json({ error: 'Not found' }));
   return r;

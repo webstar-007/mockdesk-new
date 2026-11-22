@@ -11,7 +11,7 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const DAY = 86400000;
 export const backupDir = () => process.env.MOCKDESK_BACKUPS || path.join(ROOT, 'data', 'backups');
 export const BACKUP_DEFAULTS = { enabled: true, everyHours: 24, keep: 7 };
-const NAME_RE = /^mockdesk-\d{4}-\d{2}-\d{2}-\d{4}\.db$/;
+export const NAME_RE = /^mockdesk-\d{4}-\d{2}-\d{2}-\d{4}\.db$/;
 
 /** Make one backup file now (a consistent copy of the live database) and delete the oldest ones beyond `keep`. */
 export function runBackup({ db, now, settings, force = false }) {

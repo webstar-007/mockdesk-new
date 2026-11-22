@@ -45,8 +45,9 @@ export default function PageNav({ trail, home }) {
 
 export function studentTrail(p) {
   const d = ['Dashboard', '/']; const seg = p.split('/').filter(Boolean);
-  const one = { profile: 'Profile', toolkit: 'Exam toolkit', notebook: 'Notebook', fixes: 'Corrections', inbox: 'Inbox' };
+  const one = { profile: 'Profile', toolkit: 'Exam toolkit', notebook: 'Notebook', fixes: 'Corrections', inbox: 'Inbox', support: 'Help and support' };
   if (!seg.length) return null;
+  if (seg[0] === 'support' && seg[1]) return [d, ['Help and support', '/support'], ['Question']];
   if (one[seg[0]]) return [d, [one[seg[0]]]];
   if (seg[0] === 'mock') return [d, ['Instructions']];
   if (seg[0] === 'live') return [d, ['Live mock']];

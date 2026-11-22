@@ -15,6 +15,7 @@ export default function Header() {
           <NavLink to="/notebook">Notebook</NavLink>
           <NavLink to="/toolkit">Toolkit</NavLink>
           <NavLink to="/profile">Profile</NavLink>
+          {site.features?.support !== false && <NavLink to="/support">Help</NavLink>}
         </nav>
         <div className="topbar-user">
           <ThemeToggle /><InboxBell /><span className="who" title={user?.email}>{user?.name}</span>

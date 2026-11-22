@@ -32,7 +32,7 @@ export function openDb(file = process.env.MOCKDESK_DB || path.join(ROOT, 'data',
   for (const sql of ["ALTER TABLE attempts ADD COLUMN integrity TEXT DEFAULT '{}'", 'ALTER TABLE attempts ADD COLUMN ip TEXT', 'ALTER TABLE attempts ADD COLUMN device TEXT', 'ALTER TABLE users ADD COLUMN last_ip TEXT']) { try { db.exec(sql); } catch { /* column already exists */ } }
   try { db.exec('ALTER TABLE mocks ADD COLUMN doubt_chat INTEGER DEFAULT 1'); } catch { /* column already exists */ }
   // v7: referrals, announcements v2, notifications, batches, practice sets
-  for (const sql of ['ALTER TABLE users ADD COLUMN ref_code TEXT', 'ALTER TABLE users ADD COLUMN referred_by INTEGER', 'ALTER TABLE users ADD COLUMN notify_prefs TEXT',
+  for (const sql of ['ALTER TABLE sessions ADD COLUMN ip TEXT', 'ALTER TABLE sessions ADD COLUMN ua TEXT', 'ALTER TABLE sessions ADD COLUMN created_at INTEGER', 'ALTER TABLE sessions ADD COLUMN view_by INTEGER', 'ALTER TABLE users ADD COLUMN ref_code TEXT', 'ALTER TABLE users ADD COLUMN referred_by INTEGER', 'ALTER TABLE users ADD COLUMN notify_prefs TEXT',
     'ALTER TABLE mocks ADD COLUMN ref_locked INTEGER DEFAULT 0', 'ALTER TABLE attempts ADD COLUMN score REAL', 'ALTER TABLE attempts ADD COLUMN accuracy REAL', "ALTER TABLE mocks ADD COLUMN exam_id TEXT DEFAULT 'ssc-cgl-t2'", "ALTER TABLE mocks ADD COLUMN kind TEXT DEFAULT 'mock'", 'ALTER TABLE mocks ADD COLUMN paper_year INTEGER', 'ALTER TABLE mocks ADD COLUMN paper_label TEXT', 'ALTER TABLE mocks ADD COLUMN live_until INTEGER', "ALTER TABLE attempts ADD COLUMN kind TEXT DEFAULT 'mock'",
     'ALTER TABLE announcements ADD COLUMN title TEXT', 'ALTER TABLE announcements ADD COLUMN link_url TEXT', 'ALTER TABLE announcements ADD COLUMN link_label TEXT',
     "ALTER TABLE announcements ADD COLUMN audience TEXT DEFAULT 'all'", 'ALTER TABLE announcements ADD COLUMN batch_id INTEGER', 'ALTER TABLE announcements ADD COLUMN starts_at INTEGER',
@@ -40,6 +40,10 @@ export function openDb(file = process.env.MOCKDESK_DB || path.join(ROOT, 'data',
     "ALTER TABLE announcements ADD COLUMN notify TEXT DEFAULT ''", 'ALTER TABLE announcements ADD COLUMN created_by TEXT', 'ALTER TABLE announcements ADD COLUMN updated_at INTEGER', 'ALTER TABLE announcements ADD COLUMN broadcast_at INTEGER']) { try { db.exec(sql); } catch { /* column already exists */ } }
   db.exec(`
     CREATE UNIQUE INDEX IF NOT EXISTS idx_users_ref ON users(ref_code);
+    CREATE TABLE IF NOT EXISTS tickets (id INTEGER PRIMARY KEY, user_id INTEGER, subject TEXT, category TEXT, status TEXT DEFAULT 'open', priority TEXT DEFAULT 'normal', assigned_to INTEGER, last_from TEXT, created_at INTEGER, updated_at INTEGER, closed_at INTEGER, rating INTEGER);
+    CREATE TABLE IF NOT EXISTS ticket_msgs (id INTEGER PRIMARY KEY, ticket_id INTEGER, from_role TEXT, author_id INTEGER, author TEXT, body TEXT, note INTEGER DEFAULT 0, at INTEGER);
+    CREATE INDEX IF NOT EXISTS idx_tickets_user ON tickets(user_id, updated_at);
+    CREATE INDEX IF NOT EXISTS idx_ticket_msgs ON ticket_msgs(ticket_id, at);
     CREATE TABLE IF NOT EXISTS settings(key TEXT PRIMARY KEY, value TEXT);
     CREATE TABLE IF NOT EXISTS unlocks(user_id INTEGER, mock_id TEXT, reason TEXT, at INTEGER, PRIMARY KEY(user_id, mock_id));
     CREATE TABLE IF NOT EXISTS referrals(id INTEGER PRIMARY KEY, referrer_id INTEGER, friend_id INTEGER UNIQUE, status TEXT DEFAULT 'joined', created_at INTEGER, qualified_at INTEGER);

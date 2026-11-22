@@ -13,16 +13,19 @@ function Trend({ trend }) {
 }
 export default function UserDetail() {
   const { id } = useParams(); const nav = useNavigate();
+  const { data: sess, reload: reloadSess } = useLoad(`/admin/users/${id}/sessions`, [id]);
   const { data: d, err, loading, reload } = useLoad(`/admin/users/${id}`, [id]);
   const [dlg, setDlg] = useState(null); const [nr, setNr] = useState('editor'); const [busy, setBusy] = useState(false); const [e2, setE2] = useState(''); const [pw, setPw] = useState(''); const [perms, setPerms] = useState(['content']);
   if (loading && !d) return <Loading />; if (err) return <Err>{err}</Err>;
   const u = d.user; const key = u.email || u.phone; const s = d.summary;
   const run = async (fn, ok, close = true) => { setBusy(true); setE2(''); try { await fn(); toast(ok); if (close) setDlg(null); reload(); } catch (x) { setE2(x.message); } finally { setBusy(false); } };
+  const viewAs = async () => { setBusy(true); try { await api.post(`/admin/users/${id}/view-as`); window.location.assign('/'); } catch (x) { toast(x.message, 'bad'); setBusy(false); } };
   return (
     <>
       <PageHead title={u.name} sub={`${key} · joined ${dt(Date.parse(u.createdAt))}`}>
         <Badge tone={statusTone[u.role]}>{u.role}</Badge><Badge tone={statusTone[u.status]}>{u.status}</Badge>
         {u.role === 'editor' && <button className="btn btn-ghost" onClick={() => { setPerms(u.perms || ['content']); setDlg('perms'); }}>Change access</button>}
+        {u.role === 'student' && <button className="btn btn-primary" disabled={busy} onClick={viewAs}>View as student</button>}
         <button className="btn btn-ghost" onClick={() => setDlg('rename')}>Rename</button>
         <button className="btn btn-ghost" onClick={() => setDlg(u.status === 'suspended' ? 'react' : 'suspend')}>{u.status === 'suspended' ? 'Reactivate' : 'Suspend'}</button>
       </PageHead>
@@ -41,10 +44,12 @@ export default function UserDetail() {
       <div className="card nopad">{d.attempts.length ? <div style={{ overflowX: 'auto' }}><table className="ad-table"><thead><tr><th>Mock</th><th>Status</th><th>Started</th><th className="num">Score</th><th className="num">Accuracy</th><th>Time</th><th /></tr></thead>
         <tbody>{d.attempts.map((a) => <tr key={a.id}><td><b>{a.mockName}</b></td><td><Badge tone={statusTone[a.status]}>{a.status === 'in_progress' ? 'in progress' : a.status}</Badge>{a.auto && <Badge tone="warn">auto</Badge>}</td><td>{dt(a.startedAt)}</td><td className="num">{a.score == null ? '–' : `${a.score}/${a.max}`}</td><td className="num">{a.accuracy == null ? '–' : `${a.accuracy}%`}</td><td>{mmss(a.timeSec)}</td><td><Link to={`/admin/attempts/${a.id}`}>Open</Link></td></tr>)}</tbody></table></div> : <Empty>This user has not started any test.</Empty>}</div>
       <NoteCard id={id} note={u.note} onSaved={reload} />
+      <h2>Signed in on</h2>
+      <section className="card">{!sess ? <Loading /> : !sess.sessions.length ? <p className="muted" style={{ margin: 0 }}>Not signed in anywhere right now.</p> : <ul className="ad-devices">{sess.sessions.map((x) => <li key={x.id}><div><b>{browserOf(x.ua)}</b><small className="muted">{x.ip || 'unknown address'} · {x.at ? `signed in ${ago(x.at)}` : 'earlier sign-in'} · expires {dt(x.expiresAt)}</small></div><button className="btn btn-ghost btn-sm" onClick={async () => { try { await api.del(`/admin/users/${id}/sessions/${x.id}`); toast('Signed out of that device'); reloadSess(); } catch (e) { toast(e.message, 'bad'); } }}>Sign out</button></li>)}</ul>}</section>
       <h2>Account actions</h2>
       <section className="card ad-pill-row" style={{ alignItems: 'center' }}>
         <button className="btn btn-ghost" onClick={() => setDlg('signout')}>Sign out everywhere</button><button className="btn btn-ghost" onClick={() => setDlg('password')}>Set new password</button>
-        <button className="btn btn-ghost" onClick={() => setDlg('role')}>Change role ({u.role})</button><button className="btn btn-ghost dng" onClick={() => setDlg('delete')}>Delete user and data</button>
+        <button className="btn btn-ghost" onClick={() => setDlg('role')}>Change role ({u.role})</button><a className="btn btn-ghost" href={`/api/admin/users/${id}/export`} download>Download their data</a><button className="btn btn-ghost dng" onClick={() => setDlg('erase')}>Erase their data</button><button className="btn btn-ghost dng" onClick={() => setDlg('delete')}>Delete user and data</button>
       </section>
       {dlg === 'rename' && <RenameDlg name={u.name} onClose={() => setDlg(null)} onSave={(name) => run(() => api.patch(`/admin/users/${id}`, { name }), 'Name updated')} busy={busy} error={e2} />}
       {dlg === 'suspend' && <ConfirmModal title="Suspend this user?" label="Suspend" danger busy={busy} error={e2} onClose={() => setDlg(null)} onConfirm={() => run(() => api.patch(`/admin/users/${id}`, { status: 'suspended' }), 'User suspended')}><p>{u.name} will be signed out and unable to log in until you reactivate the account. Their data is kept.</p></ConfirmModal>}
@@ -55,11 +60,13 @@ export default function UserDetail() {
         {nr === 'editor' && <PermPicker value={perms} onChange={setPerms} />}
         <p className="small muted">Admins and staff use the admin console only and cannot take tests. Change the role back to Student to let this person take tests.</p></ConfirmModal>}
       {dlg === 'perms' && <Dialog title={`Access for ${u.name}`} onClose={() => setDlg(null)}><PermPicker value={perms} onChange={setPerms} /><Err>{e2}</Err><div className="modal-act"><button className="btn btn-ghost" onClick={() => setDlg(null)}>Cancel</button><button className="btn btn-primary" disabled={busy} onClick={() => run(() => api.patch(`/admin/users/${id}`, { perms }), 'Access updated')}>Save access</button></div></Dialog>}
+      {dlg === 'erase' && <ConfirmModal title="Erase this person’s data?" word={key} label="Erase everything" danger busy={busy} error={e2} onClose={() => setDlg(null)} onConfirm={(c) => run(async () => { await api.post(`/admin/users/${id}/erase`, { confirm: c }); nav('/admin/users'); }, 'Their data was erased', false)}><p>Use this when someone asks you to delete their data. It removes the account and everything linked to it: attempts, notes, bookmarks, messages, support questions, devices and sign-in history. It cannot be undone. Download their data first if you need a copy.</p></ConfirmModal>}
       {dlg === 'delete' && <ConfirmModal title="Delete this user?" word={key} label="Delete forever" danger busy={busy} error={e2} onClose={() => setDlg(null)} onConfirm={(c) => run(async () => { await api.del(`/admin/users/${id}`, { confirm: c }); nav('/admin/users'); }, 'User deleted', false)}><p>This permanently removes the account, all attempts and reports. It cannot be undone.</p></ConfirmModal>}
       {dlg === 'password' && <Dialog title="Set a new password" onClose={() => setDlg(null)}><label className="ad-field">New password (8+ characters)<input type="text" value={pw} onChange={(e) => setPw(e.target.value)} autoFocus /></label><p className="small muted">The user is signed out everywhere. Share the new password with them securely.</p><Err>{e2}</Err><div className="modal-act"><button className="btn btn-ghost" onClick={() => setDlg(null)}>Cancel</button><button className="btn btn-primary" disabled={busy || pw.length < 8} onClick={() => run(() => api.post(`/admin/users/${id}/password`, { password: pw }), 'Password updated')}>Save password</button></div></Dialog>}
     </>
   );
 }
+const browserOf = (ua = '') => { const b = /Edg\//.test(ua) ? 'Edge' : /Chrome\//.test(ua) ? 'Chrome' : /Firefox\//.test(ua) ? 'Firefox' : /Safari\//.test(ua) ? 'Safari' : ua ? 'Other browser' : 'Unknown device'; const o = /Android/.test(ua) ? 'Android' : /iPhone|iPad/.test(ua) ? 'iOS' : /Windows/.test(ua) ? 'Windows' : /Mac OS/.test(ua) ? 'Mac' : /Linux/.test(ua) ? 'Linux' : ''; return o ? `${b} on ${o}` : b; };
 function NoteCard({ id, note, onSaved }) {
   const [v, setV] = useState(note || ''); const [busy, setBusy] = useState(false);
   return <><h2>Private admin note</h2><section className="card"><textarea rows={3} maxLength={600} value={v} onChange={(e) => setV(e.target.value)} placeholder="Only admins see this. e.g. Paid for coaching batch, asked for a mock reset." aria-label="Admin note" /><p style={{ margin: '8px 0 0' }}><button className="btn btn-ghost btn-sm" disabled={busy || v === (note || '')} onClick={async () => { setBusy(true); try { await api.patch(`/admin/users/${id}`, { note: v }); toast('Note saved'); onSaved(); } catch (e) { toast(e.message, 'bad'); } finally { setBusy(false); } }}>Save note</button></p></section></>;

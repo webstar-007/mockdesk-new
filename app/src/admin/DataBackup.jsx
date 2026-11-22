@@ -1,13 +1,14 @@
 import { useState } from 'react';
 import { api } from '../lib/api.js';
 import { useAuth } from '../lib/auth.jsx';
+import { Link } from 'react-router-dom';
 import { Badge, ConfirmModal, Err, Loading, PageHead, dt, toast, useLoad } from './ui.jsx';
 
 const size = (b) => (b > 1048576 ? `${(b / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(b / 1024))} KB`);
 
 function Backups() {
   const { data: d, err, loading, reload } = useLoad('/admin/backups');
-  const [busy, setBusy] = useState(false); const [del, setDel] = useState(null);
+  const [busy, setBusy] = useState(false); const [del, setDel] = useState(null); const [rst, setRst] = useState(null); const [staged, setStaged] = useState(false); const { user } = useAuth();
   if (loading && !d) return <Loading />; if (err) return <Err>{err}</Err>;
   const save = async (patch) => { try { await api.put('/admin/backups/config', patch); toast('Saved'); reload(); } catch (e) { toast(e.message, 'bad'); } };
   const now = async () => { setBusy(true); try { await api.post('/admin/backups'); toast('Backup created'); reload(); } catch (e) { toast(e.message, 'bad'); } finally { setBusy(false); } };
@@ -23,8 +24,10 @@ function Backups() {
         <button className="btn btn-primary" disabled={busy} onClick={now}>Back up now</button>
       </div>
       <p className="small muted">{d.last ? `Last backup: ${dt(d.last)}` : 'No backup has run yet.'}</p>
-      {!d.backups.length ? <p className="muted">No backups yet.</p> : <div style={{ overflowX: 'auto' }}><table className="ad-table"><thead><tr><th>Copy</th><th>Created</th><th>Size</th><th /></tr></thead><tbody>{d.backups.map((x) => <tr key={x.name}><td><code>{x.name}</code></td><td>{dt(x.at)}</td><td className="num">{size(x.size)}</td><td style={{ whiteSpace: 'nowrap' }}><a className="btn btn-ghost btn-sm" href={`/api/admin/backups/${x.name}`} download>Download</a> <button className="btn btn-ghost btn-sm" onClick={() => setDel(x.name)}>Delete</button></td></tr>)}</tbody></table></div>}
-      <details style={{ marginTop: 12 }}><summary><b>How to restore a backup</b></summary><ol className="small"><li>Stop the MockDesk server.</li><li>Download the backup you want.</li><li>Replace the database file (<code>data/mockdesk.db</code>, or the path in <code>MOCKDESK_DB</code>) with it, and delete the <code>.db-wal</code> and <code>.db-shm</code> files next to it.</li><li>Start the server again. Everything is back as it was at that time.</li></ol></details>
+      {!d.backups.length ? <p className="muted">No backups yet.</p> : <div style={{ overflowX: 'auto' }}><table className="ad-table"><thead><tr><th>Copy</th><th>Created</th><th>Size</th><th /></tr></thead><tbody>{d.backups.map((x) => <tr key={x.name}><td><code>{x.name}</code></td><td>{dt(x.at)}</td><td className="num">{size(x.size)}</td><td style={{ whiteSpace: 'nowrap' }}><a className="btn btn-ghost btn-sm" href={`/api/admin/backups/${x.name}`} download>Download</a> {user?.role === 'admin' && <button className="btn btn-ghost btn-sm" onClick={() => setRst(x.name)}>Restore</button>} <button className="btn btn-ghost btn-sm" onClick={() => setDel(x.name)}>Delete</button></td></tr>)}</tbody></table></div>}
+      <details style={{ marginTop: 12 }}><summary><b>How to restore a backup</b></summary><ol className="small"><li>Easiest: press Restore next to the copy you want, then restart the server from Server tools.</li><li>By hand instead: stop the MockDesk server and download the backup you want.</li><li>Replace the database file (<code>data/mockdesk.db</code>, or the path in <code>MOCKDESK_DB</code>) with it, and delete the <code>.db-wal</code> and <code>.db-shm</code> files next to it.</li><li>Start the server again. Everything is back as it was at that time.</li></ol></details>
+      {staged && <p className="alert" role="status" style={{ marginTop: 12 }}>The backup is ready to be restored. It is applied the next time the server starts. Open <Link to="/admin/tools">Server tools</Link> and press Restart. The current database is kept as a separate file, so nothing is lost.</p>}
+      {rst && <ConfirmModal title="Restore this backup?" word="restore" label="Prepare restore" danger onClose={() => setRst(null)} onConfirm={async () => { try { await api.post(`/admin/backups/${rst}/restore`, { confirm: 'restore' }); setRst(null); setStaged(true); toast('Restore prepared. Restart the server to apply it.'); } catch (e) { toast(e.message, 'bad'); } }}><p>Everything students did after <b>{rst}</b> was made will be gone once the server restarts: new sign-ups, attempts and settings changes. The database you have now is kept beside it, so you can go back.</p></ConfirmModal>}
       {del && <ConfirmModal title="Delete this backup?" label="Delete" danger onClose={() => setDel(null)} onConfirm={async () => { try { await api.del(`/admin/backups/${del}`); toast('Deleted'); setDel(null); reload(); } catch (e) { toast(e.message, 'bad'); } }}><p><code>{del}</code> will be removed from the server.</p></ConfirmModal>}
     </section>
   );
