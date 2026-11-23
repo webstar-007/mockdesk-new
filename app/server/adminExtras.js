@@ -194,11 +194,15 @@ export function mountAdminExtras({ r, db, now, audit, bad, results, settings, no
   // ---------- question quality ----------
   const computeQuality = (minN) => {
     const agg = new Map(); const secTime = new Map();
-    for (const { row, res: rs } of results()) for (const q of rs.questions || []) {
+    const all = [...results()]; const byMock = new Map();
+    for (const { row, res: rs } of all) { const pc0 = rs.summary?.percentage; if (typeof pc0 === 'number') (byMock.get(row.mock_id) || byMock.set(row.mock_id, []).get(row.mock_id)).push(pc0); }
+    const topCut = new Map(); for (const [m, a] of byMock) if (a.length >= 8) { a.sort((x, y) => y - x); topCut.set(m, a[Math.max(0, Math.ceil(a.length * 0.25) - 1)]); }
+    for (const { row, res: rs } of all) for (const q of rs.questions || []) {
       if (q.qualifying || !Array.isArray(q.options)) continue;
-      const s = agg.get(q.id) || { id: q.id, n: 0, correct: 0, wrong: 0, skipped: 0, time: 0, dist: q.options.map(() => 0), key: q.correct, section: q.section, topic: q.topic, difficulty: q.difficulty || 'moderate', text: q.text, mockIds: new Set(), noExp: !q.explanation };
+      const s = agg.get(q.id) || { id: q.id, n: 0, correct: 0, wrong: 0, skipped: 0, time: 0, dist: q.options.map(() => 0), key: q.correct, section: q.section, topic: q.topic, difficulty: q.difficulty || 'moderate', text: q.text, mockIds: new Set(), noExp: !q.explanation, topAtt: 0, topRight: 0 };
       s.n++; s.time += q.timeSec || 0; s.mockIds.add(row.mock_id);
       if (q.status === 'correct') s.correct++; else if (q.status === 'incorrect') s.wrong++; else s.skipped++;
+      if (topCut.has(row.mock_id) && rs.summary?.percentage >= topCut.get(row.mock_id) && q.status !== 'skipped' && (q.status === 'correct' || q.status === 'incorrect')) { s.topAtt++; if (q.status === 'correct') s.topRight++; }
       if (Number.isInteger(q.selected) && q.selected < s.dist.length) s.dist[q.selected]++;
       agg.set(q.id, s);
       const st = secTime.get(q.section) || { n: 0, t: 0 }; st.n++; st.t += q.timeSec || 0; secTime.set(q.section, st);
@@ -215,14 +219,17 @@ export function mountAdminExtras({ r, db, now, audit, bad, results, settings, no
       const rep = reportsBy.get(s.id); const flags = [];
       if (attempted >= 10 && s.dist[topWrong] > s.dist[s.key] && dist[topWrong] >= 40) flags.push({ key: 'wrong_key', label: 'Answer key may be wrong', detail: `${dist[topWrong]}% chose option ${'ABCD'[topWrong]} but the key says ${'ABCD'[s.key]} (${dist[s.key]}%).`, severity: 3 });
       if (attempted >= 10) { const hi = s.dist.map((d, i) => [d, i]).filter(([d]) => pc(d) >= 30).map(([, i]) => i); if (hi.length >= 2 && !flags.some((f) => f.key === 'wrong_key')) flags.push({ key: 'ambiguous', label: 'May be ambiguous', detail: `Options ${hi.map((i) => 'ABCD'[i]).join(' and ')} each drew 30% or more.`, severity: 2 }); }
+      if (attempted >= 8 && s.correct === 0) flags.push({ key: 'nobody_right', label: 'Nobody got it right', detail: `${attempted} students answered it and none were correct. Check the key, or replace the question.`, severity: 3, action: 'replace' });
+      if (s.topAtt >= 5 && s.topRight / s.topAtt < 0.4) flags.push({ key: 'toppers_wrong', label: 'Most toppers got it wrong', detail: `Only ${Math.round(s.topRight / s.topAtt * 100)}% of the top scorers (${s.topRight} of ${s.topAtt}) answered it correctly. The key or wording may be off.`, severity: s.topRight / s.topAtt < 0.25 ? 3 : 2, action: 'review' });
       if (rep?.wa >= 2 || rep?.un >= 2 || rep?.c >= 3) flags.push({ key: 'reported', label: 'Students reported it', detail: `${rep.c} open report${rep.c > 1 ? 's' : ''}.`, severity: 3 });
       if (s.difficulty === 'easy' && pctRight < 35 && s.n >= 10) flags.push({ key: 'harder_than_tag', label: 'Harder than its tag', detail: `Tagged easy but only ${pctRight}% got it right.`, severity: 1 });
       if (s.difficulty === 'hard' && pctRight > 85 && s.n >= 10) flags.push({ key: 'easier_than_tag', label: 'Easier than its tag', detail: `Tagged hard but ${pctRight}% got it right.`, severity: 1 });
       if (pc(s.skipped) >= 50 && s.n >= 10) flags.push({ key: 'skipped', label: 'Often skipped', detail: `${pc(s.skipped)}% left it blank.`, severity: 1 });
       if (secAvg && avgTime >= Math.max(60, secAvg * 2) && s.n >= 10) flags.push({ key: 'slow', label: 'Takes too long', detail: `${avgTime}s on average, against ${Math.round(secAvg)}s for its section.`, severity: 1 });
       if (s.noExp) flags.push({ key: 'no_explanation', label: 'No explanation', detail: 'Students see no solution for this question.', severity: 1 });
+      for (const f of flags) if (!f.action) f.action = f.key === 'ambiguous' ? 'replace' : 'review';
       const mockId = current.get(s.id); const liveIn = mockId || [...s.mockIds][0];
-      list.push({ id: s.id, text: String(s.text || '').slice(0, 140), section: s.section, topic: s.topic, difficulty: s.difficulty, mockId: mockId || null, mockName: mockName.get(liveIn) || liveIn, attempts: s.n, pctRight, pctWrong: pc(s.wrong), pctSkipped: pc(s.skipped), avgTimeSec: avgTime, sectionAvgSec: Math.round(secAvg), options: dist, keyIndex: s.key, reports: rep?.c || 0, flags, worst: Math.max(0, ...flags.map((f) => f.severity)) });
+      list.push({ id: s.id, text: String(s.text || '').slice(0, 140), section: s.section, topic: s.topic, difficulty: s.difficulty, mockId: mockId || null, mockName: mockName.get(liveIn) || liveIn, attempts: s.n, pctRight, pctWrong: pc(s.wrong), pctSkipped: pc(s.skipped), avgTimeSec: avgTime, sectionAvgSec: Math.round(secAvg), options: dist, keyIndex: s.key, reports: rep?.c || 0, flags, suggest: flags.some((f) => f.severity >= 2) ? (flags.some((f) => f.action === 'replace') ? 'replace' : 'review') : null, worst: Math.max(0, ...flags.map((f) => f.severity)) });
     }
     return list;
   };
@@ -235,5 +242,5 @@ export function mountAdminExtras({ r, db, now, audit, bad, results, settings, no
     res.json({ total: list.length, flagged: list.filter((x) => x.worst >= 2).length, counts, minAttempts: minN, mocks: [...new Set(list.map((x) => x.mockId).filter(Boolean))].map((id) => ({ id, name: mockName.get(id) || id })), questions: out.slice(0, 200) });
   });
   mountCampaigns({ r, db, now, audit, bad, notifier });
-  mountAdminExtras2({ r, db, now, audit, bad, notifier, computeQuality, results, page });
+  return mountAdminExtras2({ r, db, now, audit, bad, notifier, computeQuality, results, page });
 }

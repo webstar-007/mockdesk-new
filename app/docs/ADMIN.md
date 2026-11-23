@@ -163,3 +163,13 @@ All of these are in the admin console. Open **Server** for the tools, **Tests > 
 - *Erase their data.* Removes the account and everything linked to it (attempts, notes, bookmarks, messages, support questions, devices, sign-in history). Type their email to confirm. It cannot be undone.
 
 **Students list, bulk actions.** Tick students, then: Suspend, Reactivate, Sign out, Add to batch, Remove from batch, Send message, Set target score or Download list (CSV of the selected rows).
+
+## v19: Alerts, quality loop, auto-build and assignments
+
+**Alerts.** The bell in the top bar and **Server > Alerts** list problems found automatically: disk space, error spikes, backup failures or no recent backup, failed or paused jobs, server downtime, questions needing review, assignments past due, and auto-built mocks ready to publish. Mark read, hide for a day, or open the related page. Under *Delivery and thresholds* set the limits and turn on email and/or WhatsApp (set up under Integrations); use *Send a test* to check. Each problem is sent once, not repeatedly.
+
+**Question quality.** *Questions > Quality* adds the filters *Nobody got it right* and *Toppers got it wrong*. Flagged questions raise an alert; review or replace them from there.
+
+**Mock builder and auto-build.** In *Tests > Build from bank* pick sections, topics and difficulty, preview, and save as draft or schedule it. *Weekly auto-build* makes a mock on its own every N days (draft or scheduled) and alerts you when it is ready, or when the bank is short.
+
+**Assignments.** Teachers use *Assignments* in the teacher portal. Admins see everything under *Students > Assignments*.

@@ -1,5 +1,4 @@
 // v12 control room: switches, security, live monitoring, background jobs, integrations, bulk actions, config export/import.
-import fs from 'node:fs';
 import os from 'node:os';
 import { cleanControls, controlsOf, FEATURES } from './lib/controls.js';
 import { on } from './lib/credentials.js';
@@ -104,15 +103,10 @@ export function mountControl({ r, db, now, audit, bad, settings, notifier, maile
     const c = controlsOf(settings);
     if (c.maintenance.mode !== 'off') add('bad', c.maintenance.mode === 'hard' ? 'Maintenance mode is ON. Students are locked out.' : 'Maintenance mode is ON. Students cannot start tests or sign up.', 'control');
     if (!c.signups.open) add('warn', 'Sign-ups are closed.', 'control');
-    const errs = recentErrors().filter((e) => t - e.at < 3600000).length; if (errs) add('bad', `${errs} server error(s) in the last hour.`, 'monitor');
     const failed = db.prepare('SELECT COUNT(*) c FROM login_log WHERE ok=0 AND at>?').get(t - 3600000).c; if (failed >= 10) add('warn', `${failed} failed sign-ins in the last hour.`, 'security');
     const anomalies = db.prepare("SELECT COUNT(*) c FROM audit WHERE action='anomaly_flag' AND at>?").get(t - DAY).c; void anomalies;
-    const lastBk = settings.get('backup_last', 0); if (!lastBk || t - lastBk > 3 * DAY) add('warn', lastBk ? 'No backup in the last 3 days.' : 'No automatic backup has run yet.', 'data');
     const doubts = (() => { try { return db.prepare("SELECT COUNT(*) c FROM doubts WHERE status='open'").get().c; } catch { return 0; } })(); if (doubts) add('info', `${doubts} open student doubt(s).`, 'doubts');
     const tk = (() => { try { return db.prepare("SELECT COUNT(*) c FROM tickets WHERE status='open'").get().c; } catch { return 0; } })(); if (tk) add('info', `${tk} support question(s) waiting for a reply.`, 'support');
-    const paused = jobs.list().filter((j) => j.paused); if (paused.length) add('warn', `${paused.length} background job(s) paused.`, 'control');
-    const stale = jobs.list().filter((j) => !j.paused && j.lastError); if (stale.length) add('bad', `Background job failed: ${stale[0].label}.`, 'monitor');
-    try { const st = fs.statfsSync(process.cwd()); const pct = st.bavail / st.blocks * 100; if (pct < 15) add('bad', `Disk is ${Math.round(100 - pct)}% full.`, 'system'); } catch { /* unsupported */ }
     res.json({ items });
   });
 

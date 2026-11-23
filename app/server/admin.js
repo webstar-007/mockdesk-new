@@ -14,6 +14,7 @@ import { answerAsk, EXAMPLES } from './lib/ask.js';
 import { mountAdminExtras } from './adminExtras.js';
 import { mountOps } from './ops.js';
 import { mountControl } from './control.js';
+import { mountAlertCentre } from './alertcentre.js';
 import { mountTools } from './tools.js';
 import { eraseUser } from './lib/userdata.js';
 import { mountSupportAdmin } from './support.js';
@@ -71,7 +72,7 @@ export function cleanQuestion(body, { partial = false, strictOptions = false } =
   return { section, q, errors };
 }
 
-export function adminRouter({ exitFn, drafter = null, db, now, invalidate, getMock, readResult, hashPw, settings, notifier, features, features2, runReminders, exams, mailer = null, jobs, metrics, controls, creds, live, otpSender, whatsapp = null }) {
+export function adminRouter({ assign, exitFn, drafter = null, db, now, invalidate, getMock, readResult, hashPw, settings, notifier, features, features2, runReminders, exams, mailer = null, jobs, metrics, controls, creds, live, otpSender, whatsapp = null }) {
   const r = express.Router();
   // Admins can do everything. Staff (role "editor") get the content tools plus whatever permissions an admin ticked for them.
   r.use((req, res, next) => {
@@ -605,19 +606,24 @@ export function adminRouter({ exitFn, drafter = null, db, now, invalidate, getMo
   });
 
   // ---------- mock builder: assemble a draft mock from the question bank ----------
-  r.post('/mocks/build', (req, res) => {
-    const b = req.body || {}; const dry = !!b.dryRun; const includeMocks = b.include === 'all';
-    const n = String(b.name || '').trim().slice(0, 80); if (!dry && !n) return bad(res, 'Give the mock a name');
-    const difficulty = b.difficulty || 'moderate'; if (!examConfig.difficulties.includes(difficulty)) return bad(res, 'Choose easy, moderate or hard');
+  let qx = null;
+  const fail = (error, code = 400, extra) => ({ error, code, extra });
+  /** Pick questions from the bank and make a draft mock. Used by the Build dialog and the weekly auto-build. */
+  const runBuild = (b, actor) => {
+    const dry = !!b.dryRun; const includeMocks = b.include === 'all';
+    const n = String(b.name || '').trim().slice(0, 80); if (!dry && !n) return fail('Give the mock a name');
+    const difficulty = b.difficulty || 'moderate'; if (!examConfig.difficulties.includes(difficulty)) return fail('Choose easy, moderate or hard');
     const exId = b.examId && exams.get(b.examId) ? b.examId : BUILTIN_ID; const exKeys = Object.keys(exams.patternFor(exId).sections);
     const plan = (Array.isArray(b.plan) ? b.plan : []).filter((p) => exKeys.includes(p.section));
     const cnt = (v) => Math.max(0, Math.min(150, Math.floor(Number(v) || 0)));
     const wants = []; for (const p of plan) for (const d of examConfig.difficulties) if (cnt(p[d])) wants.push({ section: p.section, difficulty: d, count: cnt(p[d]) });
-    if (!wants.length) return bad(res, 'Say how many questions you want from at least one section');
-    if (wants.reduce((a, w) => a + w.count, 0) > 300) return bad(res, 'That is too many questions for one mock');
+    if (!wants.length) return fail('Say how many questions you want from at least one section');
+    if (wants.reduce((a, w) => a + w.count, 0) > 300) return fail('That is too many questions for one mock');
+    const topicSet = Array.isArray(b.topics) && b.topics.length ? new Set(b.topics.map((x) => String(x))) : null;
     const mockNames = new Map(db.prepare("SELECT id, name, status FROM mocks").all().map((m) => [m.id, m]));
     const rows = db.prepare('SELECT id, mock_id, section, position, data FROM questions').all().map((x) => ({ ...x, d: JSON.parse(x.data) }))
-      .filter((x) => x.mock_id === 'pool' || (includeMocks && mockNames.get(x.mock_id)?.status !== 'archived'));
+      .filter((x) => x.mock_id === 'pool' || (includeMocks && mockNames.get(x.mock_id)?.status !== 'archived'))
+      .filter((x) => !topicSet || topicSet.has(String(x.d.topic || 'General')));
     const taken = new Set(); const seenText = new Set(); const picked = []; const shortages = [];
     const shuffle = (a) => { for (let i = a.length - 1; i > 0; i--) { const j = crypto.randomInt(i + 1); [a[i], a[j]] = [a[j], a[i]]; } return a; };
     const topicCount = new Map();
@@ -636,16 +642,68 @@ export function adminRouter({ exitFn, drafter = null, db, now, invalidate, getMo
     }
     const preview = picked.map((x) => ({ id: x.id, section: x.section, difficulty: x.d.difficulty || 'moderate', topic: x.d.topic, text: String(x.d.text).slice(0, 110), from: x.mock_id === 'pool' ? 'Question bank' : mockNames.get(x.mock_id)?.name || x.mock_id }));
     const summary = { wanted: wants.reduce((a, w) => a + w.count, 0), picked: picked.length, topics: topicCount.size, fromBank: picked.filter((x) => x.mock_id === 'pool').length, fromMocks: picked.filter((x) => x.mock_id !== 'pool').length };
-    if (dry) return res.json({ summary, shortages, preview });
-    if (shortages.length && !b.allowPartial) return bad(res, 'The bank does not have enough questions for this plan', 409, { code: 'SHORT', summary, shortages });
-    if (!picked.length) return bad(res, 'No questions matched the plan');
+    if (dry) return { out: { summary, shortages, preview } };
+    if (shortages.length && !b.allowPartial) return fail('The bank does not have enough questions for this plan', 409, { code: 'SHORT', summary, shortages });
+    if (!picked.length) return fail('No questions matched the plan');
     const id = newId('m'); const t = now(); const number = (db.prepare('SELECT MAX(number) n FROM mocks').get().n || 0) + 1;
     db.exec('BEGIN'); try {
       db.prepare("INSERT INTO mocks(id,number,name,difficulty,description,status,tags,source,created_at,updated_at,exam_id) VALUES (?,?,?,?,?,'draft',?,'admin',?,?,?)").run(id, number, n, difficulty, String(b.description || '').slice(0, 400), JSON.stringify(cleanTags([difficulty, 'built'])), t, t, exId);
-      const to = mockRow(db, id); for (const x of picked) moveInto(to, db.prepare('SELECT * FROM questions WHERE id=?').get(x.id), req.user.name);
+      const to = mockRow(db, id); for (const x of picked) moveInto(to, db.prepare('SELECT * FROM questions WHERE id=?').get(x.id), actor);
       db.exec('COMMIT');
     } catch (e) { db.exec('ROLLBACK'); throw e; }
-    audit(req, 'mock_build', n, `${picked.length} questions`); bust(); res.status(201).json({ mock: mockSummary(parseMock(mockRow(db, id))), summary, shortages });
+    // Optional schedule: publish at a chosen time. The mock must pass the same checks as a normal publish; if not it stays a draft and says why.
+    let scheduled = null, warnings = [];
+    if (b.publishAt) {
+      const at = Date.parse(b.publishAt); if (!at) warnings.push('The publish time was not understood, so the mock stays a draft.');
+      else {
+        const m0 = parseMock(mockRow(db, id)); const pat = exams.patternFor(exId); const v = validateDbMock(m0, loadQuestions(db, id, pat), pat);
+        if (v.errors.length) warnings.push('Kept as a draft: ' + v.errors.slice(0, 3).join('; '));
+        else { db.prepare("UPDATE mocks SET status='published', available_from=?, updated_at=? WHERE id=?").run(at, now(), id); scheduled = at; }
+      }
+    }
+    bust(); return { n, id, picked, summary, shortages, scheduled, warnings, out: { mock: mockSummary(parseMock(mockRow(db, id))), summary, shortages, scheduled, warnings } };
+  };
+  r.post('/mocks/build', (req, res) => {
+    const o = runBuild(req.body || {}, req.user.name); if (o.error) return bad(res, o.error, o.code, o.extra);
+    if (!o.id) return res.json(o.out);
+    audit(req, 'mock_build', o.n, `${o.picked.length} questions${o.scheduled ? ', scheduled' : ''}`); res.status(201).json(o.out);
+  });
+  r.get('/mocks/build/topics', (req, res) => {
+    const exId = req.query.examId && exams.get(req.query.examId) ? req.query.examId : BUILTIN_ID; const keys = Object.keys(exams.patternFor(exId).sections); const by = {};
+    for (const x of db.prepare("SELECT section, data FROM questions WHERE mock_id='pool'").all()) { if (!keys.includes(x.section)) continue; const d = JSON.parse(x.data); const t = d.topic || 'General'; const o = ((by[x.section] ||= {})[t] ||= { topic: t, easy: 0, moderate: 0, hard: 0 }); o[d.difficulty || 'moderate']++; }
+    res.json({ sections: Object.fromEntries(keys.map((k) => [k, Object.values(by[k] || {}).sort((a, b) => a.topic.localeCompare(b.topic))])) });
+  });
+
+
+
+  // ---------- question quality loop: suggest replacements and swap a flagged question for one from the bank ----------
+  r.get('/quality/:qid/replacements', (req, res) => {
+    const row = db.prepare('SELECT * FROM questions WHERE id=?').get(req.params.qid); if (!row) return bad(res, 'Question not found', 404);
+    const d = JSON.parse(row.data); const used = new Set(db.prepare('SELECT data FROM questions WHERE mock_id=?').all(row.mock_id).map((x) => JSON.parse(x.data).text));
+    const list = db.prepare("SELECT id, data FROM questions WHERE mock_id='pool' AND section=? AND id!=?").all(row.section, row.id).map((x) => ({ id: x.id, d: JSON.parse(x.data) })).filter((x) => !used.has(x.d.text))
+      .map((x) => ({ id: x.id, text: String(x.d.text).slice(0, 140), topic: x.d.topic || 'General', difficulty: x.d.difficulty || 'moderate', score: (x.d.topic === d.topic ? 3 : 0) + ((x.d.difficulty || 'moderate') === (d.difficulty || 'moderate') ? 2 : 0) }))
+      .sort((a, b) => b.score - a.score || Math.random() - 0.5).slice(0, 6).map(({ score, ...x }) => ({ ...x, sameTopic: score >= 3 }));
+    res.json({ question: { id: row.id, mockId: row.mock_id, section: row.section, topic: d.topic || 'General', difficulty: d.difficulty || 'moderate' }, replacements: list });
+  });
+  r.post('/quality/:qid/replace', (req, res) => {
+    const row = db.prepare('SELECT * FROM questions WHERE id=?').get(req.params.qid); if (!row) return bad(res, 'Question not found', 404);
+    if (row.mock_id === 'pool') return bad(res, 'This question is already in the bank. Pick it from the mock that uses it.');
+    const rep = db.prepare("SELECT * FROM questions WHERE id=? AND mock_id='pool'").get(String(req.body?.withId || '')); if (!rep) return bad(res, 'Choose a replacement from the question bank');
+    if (rep.section !== row.section) return bad(res, 'The replacement must be from the same section');
+    const to = mockRow(db, row.mock_id); const t = now();
+    db.exec('BEGIN'); try {
+      const nid = moveInto(to, rep, req.user.name); db.prepare('UPDATE questions SET position=? WHERE id=?').run(row.position, nid);
+      db.prepare("UPDATE questions SET mock_id='pool', position=?, updated_at=? WHERE id=?").run(nextPos('pool', row.section), t, row.id);
+      db.prepare('SELECT id FROM questions WHERE mock_id=? AND section=? ORDER BY position').all(to.id, row.section).forEach((x, i) => db.prepare('UPDATE questions SET position=? WHERE id=?').run(i, x.id));
+      db.prepare('UPDATE mocks SET updated_at=? WHERE id=?').run(t, to.id);
+      db.prepare('INSERT INTO quality_alerts(question_id, first_seen, dismissed_at) VALUES (?,?,?) ON CONFLICT(question_id) DO UPDATE SET dismissed_at=excluded.dismissed_at').run(row.id, t, t);
+      db.exec('COMMIT');
+    } catch (e) { db.exec('ROLLBACK'); throw e; }
+    audit(req, 'question_replaced', `${row.mock_id}`, `${row.id} → ${rep.id}`); bust(); qx?.resetAlerts?.(); res.json({ ok: true, message: 'Replaced. The old question went back to the bank so nothing is lost.' });
+  });
+  r.post('/quality/:qid/reviewed', (req, res) => {
+    const t = now(); db.prepare('INSERT INTO quality_alerts(question_id, first_seen, dismissed_at) VALUES (?,?,?) ON CONFLICT(question_id) DO UPDATE SET dismissed_at=excluded.dismissed_at').run(req.params.qid, t, t);
+    audit(req, 'question_reviewed', req.params.qid); qx?.resetAlerts?.(); res.json({ ok: true });
   });
 
   // ---------- coverage: how well do the questions cover the syllabus? ----------
@@ -704,7 +762,8 @@ export function adminRouter({ exitFn, drafter = null, db, now, invalidate, getMo
     try { res.json({ q, ...answerAsk(q, { db, now, briefs, results }) }); } catch (e) { recordError('ask', e?.message || String(e)); bad(res, 'Could not answer that. Try rephrasing it.', 500); }
   });
 
-  mountAdminExtras({ r, db, now, audit, bad, results, settings, notifier, features, runReminders, page });
+  qx = mountAdminExtras({ r, db, now, audit, bad, results, settings, notifier, features, runReminders, page });
+  mountAlertCentre({ r, db, now, audit, bad, settings, notifier, mailer, whatsapp, jobs, recentErrors, qx, assign, exams, BUILTIN_ID, runBuild, bust });
   mountControl({ r, db, now, audit, bad, settings, notifier, mailer, creds, live, drafter, otpSender, whatsapp, jobs, metrics, controlsCache: controls, recentErrors });
   mountOps({ r, db, now, audit, bad, results, settings, notifier, page });
   mountTools({ r, db, now, audit, bad, settings, exitFn });

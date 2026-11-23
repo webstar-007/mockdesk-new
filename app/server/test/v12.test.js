@@ -77,7 +77,7 @@ test('jobs can be listed, paused and run', async () => {
   const run = await call('boss', 'POST', '/admin/jobs/cleanup/run'); assert.equal(run.status, 200);
   const p = await call('boss', 'PUT', '/admin/jobs/backup', { paused: true }); assert.ok(p.body.jobs.find((j) => j.name === 'backup').paused);
   assert.equal((await call('boss', 'POST', '/admin/jobs/nope/run')).status, 404);
-  const a = await call('boss', 'GET', '/admin/attention'); assert.ok(a.body.items.some((i) => /paused/.test(i.text)));
+  await call('boss', 'POST', '/admin/alert-center/check'); const a = await call('boss', 'GET', '/admin/alert-center'); assert.ok(a.body.items.some((i) => /paused/.test(i.title)));
   await call('boss', 'PUT', '/admin/jobs/backup', { paused: false });
 });
 test('integrations list and test email', async () => {

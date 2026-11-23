@@ -6,6 +6,6 @@
 #
 # Add the word editor after an email to give content-only rights (mocks, question bank, coverage, reports):
 #   writer@example.com editor
-admin@gmail.com
+#
 # you@example.com
 # +919876543210

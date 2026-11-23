@@ -48,3 +48,15 @@
 .tc-card h3{min-width:0}
 .tc-tools input{flex:1 1 220px;width:auto}.tc-tools select{flex:none;width:auto;min-width:190px}
 .tc-sec.plainsum{margin:0}.tc-notes{margin-top:0}
+
+/* v19 assignments */
+.tc-stats.three{grid-template-columns:repeat(3,minmax(0,1fr))}
+.tc-stat.bad b{color:var(--bad)}
+.tc-asg-list{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.tc-asg{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1.2fr) auto;gap:14px;align-items:center;padding:12px 14px;border:1px solid var(--line);border-radius:12px;text-decoration:none;color:var(--ink);background:var(--surface)}
+.tc-asg:hover{border-color:var(--brand)}
+.tc-asg b{display:block}.tc-asg small{display:block;margin-top:2px}
+.tc-asg-p{display:grid;gap:4px}
+.tc-nav-asg{display:inline-flex;align-items:center;gap:6px}
+.tc-asg-banner{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;padding:12px 16px;border-radius:12px;border:1px solid var(--line);border-left:4px solid var(--warn);background:var(--surface)}
+@media (max-width:700px){.tc-asg{grid-template-columns:1fr}.tc-stats.three{grid-template-columns:1fr 1fr 1fr}.tc-stats.three .tc-stat b{font-size:1.3rem}}

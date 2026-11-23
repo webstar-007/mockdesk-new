@@ -67,3 +67,12 @@
 .nd-r3{align-items:start}.nd-r3 .nd-practice>*{height:auto}
 .nd-r4 .nd-details:only-child{grid-column:1/-1}
 .nd-gauge{width:112px;height:112px}.nd-gauge b{font-size:2.1rem}.nd-snap-h{flex:1}
+
+.nd-asg{margin:0 0 16px;padding:14px 16px;border:1px solid var(--line);border-left:4px solid var(--brand);border-radius:12px;background:var(--surface)}
+.nd-asg h2{margin:0 0 8px;font-size:1rem}
+.nd-asg ul{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.nd-asg li{display:flex;align-items:center;gap:12px;flex-wrap:wrap;justify-content:space-between}
+.nd-asg li>div{display:grid;min-width:0;flex:1 1 200px}
+.nd-asg li span{color:var(--muted);font-size:.85rem}
+.nd-asg li.late .nd-asg-due{color:var(--bad);font-weight:600}
+.nd-asg li.done b{text-decoration:line-through;color:var(--muted)}

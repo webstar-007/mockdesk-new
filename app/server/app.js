@@ -18,6 +18,7 @@ import { validateDbMock } from './lib/bank.js';
 import { seedFromFiles, loadQuestions, mockRow, parseMock, sectionsFor, segmentsFor } from './lib/catalog.js';
 import { adminRouter, UPLOAD_DIR } from './admin.js';
 import { makeFeatures2 } from './features2.js';
+import { makeAssignments } from './assignments.js';
 import { makeSettings } from './lib/settings.js';
 import { mountShare, mountSharePublic } from './share.js';
 import { makeDrafter } from './lib/drafter.js';
@@ -112,6 +113,7 @@ export function createApp(db, { allowIncomplete = process.env.MOCKDESK_ALLOW_INC
   });
   const readResult = (r) => upgradeResult(JSON.parse(r.result), allSections());
   const features = makeFeatures({ db, now, settings, notifier, getMock, readResult, iso, exams });
+  const assign = makeAssignments({ db, now, notifier, readResult });
   const features2 = makeFeatures2({ db, now, iso, notifier, readResult, dropCaches: () => { snaps.clear(); features.clearBoards(); cache.clear(); } });
   app.exams = exams;
   const extras = [digestRunner({ db, notifier }), liveResultsRunner({ db, notifier, board: features.board })];
@@ -408,7 +410,7 @@ export function createApp(db, { allowIncomplete = process.env.MOCKDESK_ALLOW_INC
 
   // Admin accounts are separate from student accounts: they only use /api/admin.
   api.use(['/mocks', '/attempts', '/stats', '/questions', '/practice', '/notebook', '/bookmarks', '/referral', '/batches', '/my', '/inbox', '/push', '/announcements', '/notifications', '/errors', '/fixes', '/share-links', '/support'], (req, res, next) => (['admin', 'editor', 'teacher'].includes(req.user?.role) ? res.status(403).json({ error: 'This account uses its own console, not the student area', code: 'ADMIN_ONLY' }) : next()));
-  features.mount(api); mountSupportStudent({ api, db, now, notifier }); mountShare(api, { db, now }); features.mountTeacher(api); features2.mount(api); features2.mountTeacher(api);
+  features.mount(api); mountSupportStudent({ api, db, now, notifier }); mountShare(api, { db, now }); features.mountTeacher(api); assign.mountTeacher(api); assign.mountStudent(api); features2.mount(api); features2.mountTeacher(api);
   api.get('/mocks', (req, res) => {
     const rows = db.prepare('SELECT * FROM attempts WHERE user_id=? ORDER BY started_at DESC').all(req.user.id);
     for (const r of rows) if (r.status === 'in_progress' && mockOf(r)) expire(r);
@@ -648,8 +650,9 @@ export function createApp(db, { allowIncomplete = process.env.MOCKDESK_ALLOW_INC
   jobs.reg('broadcasts', 'Scheduled broadcasts', 'every 10 min', () => broadcastDue({ db, notifier, now }));
   jobs.reg('campaigns', 'Message campaigns', 'every 10 min', () => runCampaigns({ db, notifier, now }));
   jobs.reg('backup', 'Database backup', 'every 10 min (runs when due)', () => { const b = runBackup({ db, now, settings }); return b ? `Saved ${b.name}` : 'Not due yet'; });
+  jobs.reg('assignments', 'Assignment reminders', 'every 10 min', async () => `Sent ${await assign.run()} reminder(s)`);
   jobs.reg('cleanup', 'Tidy expired sign-ins and codes', 'every 10 min', () => { const t = now(); db.prepare('DELETE FROM sessions WHERE expires_at<?').run(t); db.prepare("DELETE FROM otps WHERE expires_at<? AND expires_at>0").run(t - 86400000); db.prepare('DELETE FROM login_log WHERE at<?').run(t - 90 * 86400000); });
-  api.use('/admin', (req, res, next) => (['admin', 'editor'].includes(req.user.role) ? next() : res.status(403).json({ error: 'Admin access only' })), adminRouter({ exitFn, drafter, db, now, invalidate, getMock, readResult, hashPw, iso, settings, notifier, features, features2, exams, runReminders: runRem, mailer, jobs, metrics, controls, creds, live, otpSender, whatsapp }));
+  api.use('/admin', (req, res, next) => (['admin', 'editor'].includes(req.user.role) ? next() : res.status(403).json({ error: 'Admin access only' })), adminRouter({ assign, exitFn, drafter, db, now, invalidate, getMock, readResult, hashPw, iso, settings, notifier, features, features2, exams, runReminders: runRem, mailer, jobs, metrics, controls, creds, live, otpSender, whatsapp }));
 
   api.use((req, res) => res.status(404).json({ error: 'Not found' }));
   app.use('/api', api);

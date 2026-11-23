@@ -5,6 +5,7 @@ import { api } from '../lib/api.js';
 import { useAuth } from '../lib/auth.jsx';
 import ThemeToggle from '../components/ThemeToggle.jsx';
 import PageNav, { teacherTrail, useCrumb } from '../components/PageNav.jsx';
+import { AssignmentList, AssignmentDetail } from './Assignments.jsx';
 
 const ago = (ms) => { if (!ms) return 'never'; const d = Math.floor((Date.now() - ms) / 86400000); return d < 1 ? 'today' : d === 1 ? 'yesterday' : `${d} days ago`; };
 const useGet = (url) => { const [s, set] = useState({ data: null, err: '' }); useEffect(() => { set({ data: null, err: '' }); api.get(url).then((data) => set({ data, err: '' })).catch((e) => set({ data: null, err: e.message })); }, [url]); return s; };
@@ -29,6 +30,12 @@ const Head = ({ children }) => <div className="tc-h">{children}</div>;
 const greet = () => { const h = new Date().getHours(); return h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening'; };
 const Loading = () => <div className="tc-skel" role="status" aria-label="Loading"><i /><i /><i /></div>;
 
+function AsgBanner() {
+  const { data } = useGet('/teacher/assignments'); if (!data) return null; const sm = data.summary;
+  if (!data.items.length) return <div className="tc-asg-banner"><span>Set a mock or practice for a batch with a due date. Reminders go out by themselves.</span><Link className="btn btn-primary btn-sm" to="/teacher/assignments">Set an assignment</Link></div>;
+  return <div className="tc-asg-banner" style={sm.overdue ? { borderLeftColor: 'var(--bad)' } : undefined}><span><b>{sm.open}</b> open assignment{sm.open === 1 ? '' : 's'}{sm.overdue ? <>, <b>{sm.overdue}</b> past due with students still to finish</> : ''}.</span><Link className="btn btn-ghost btn-sm" to="/teacher/assignments">See who has not done it</Link></div>;
+}
+
 function Batches() {
   const { data, err } = useGet('/teacher/overview');
   if (err) return <p className="alert" role="alert">{err}</p>;
@@ -37,6 +44,7 @@ function Batches() {
   if (!data.batches.length) return <><div className="tc-hello"><h1>{greet()}, {first}</h1></div><p className="card">You have not been given a batch yet. Ask your administrator to add you to one.</p></>;
   return (<div className="tc-page">
     <div className="tc-hello"><div><h1>{greet()}, {first}</h1><p className="muted">{t.students} student{t.students === 1 ? '' : 's'} across {t.batches} batch{t.batches === 1 ? '' : 'es'}{data.attention.length ? ` · ${data.attention.length} need${data.attention.length === 1 ? 's' : ''} your attention` : ' · everyone is on track'}</p></div></div>
+    <AsgBanner />
     <div className="tc-stats">
       <Stat label="Students" value={t.students} sub={`${t.batches} batch${t.batches === 1 ? '' : 'es'}`} />
       <Stat label="Active this week" value={t.active7} sub={t.students ? `${Math.round((t.active7 / t.students) * 100)}% of students` : ''} tone="good" />
@@ -161,8 +169,8 @@ export default function TeacherApp() {
   if (user?.role !== 'teacher') return <Navigate to="/" replace />;
   return (
     <div className="tc">
-      <header className="topbar"><div className="topbar-in"><Link to="/teacher" className="brand"><span className="brand-mark" aria-hidden="true">✓</span><span>{site.name} <small className="muted">Teacher</small></span></Link><div className="topbar-user"><ThemeToggle /><span className="who">{user.name}</span><button className="btn btn-ghost btn-sm" onClick={logout}>Sign out</button></div></div></header>
-      <main className="shell" id="main"><TeacherNav /><Routes><Route index element={<Batches />} /><Route path=":id" element={<Batch />} /><Route path=":id/:uid" element={<Student />} /><Route path="*" element={<Navigate to="/teacher" replace />} /></Routes></main>
+      <header className="topbar"><div className="topbar-in"><Link to="/teacher" className="brand"><span className="brand-mark" aria-hidden="true">✓</span><span>{site.name} <small className="muted">Teacher</small></span></Link><div className="topbar-user"><Link className="btn btn-ghost btn-sm" to="/teacher/assignments">Assignments</Link><ThemeToggle /><span className="who">{user.name}</span><button className="btn btn-ghost btn-sm" onClick={logout}>Sign out</button></div></div></header>
+      <main className="shell" id="main"><TeacherNav /><Routes><Route index element={<Batches />} /><Route path="assignments" element={<AssignmentList />} /><Route path="assignments/:id" element={<AssignmentDetail />} /><Route path=":id" element={<Batch />} /><Route path=":id/:uid" element={<Student />} /><Route path="*" element={<Navigate to="/teacher" replace />} /></Routes></main>
     </div>
   );
 }

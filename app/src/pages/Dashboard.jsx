@@ -20,6 +20,8 @@ export default function Dashboard() {
       .then(([m, s, h]) => { setMocks(m.mocks); setStats(s); setHist(h.attempts.filter((a) => a.status === 'submitted')); })
       .catch((e) => setErr(e.message));
   }, []);
+  const [asg, setAsg] = useState([]);
+  useEffect(() => { api.get('/my/assignments').then((d) => setAsg(d.items || [])).catch(() => {}); }, []);
   const start = async (m) => {
     if (m.locked) return nav('/profile#invite');
     if (m.status === 'in_progress') return nav(`/exam/${m.inProgressAttemptId}`);
@@ -82,6 +84,22 @@ export default function Dashboard() {
           <p>{daysLeft != null && daysLeft >= 0 ? (daysLeft === 0 ? 'Your exam is today. Good luck!' : `${daysLeft} day${daysLeft === 1 ? '' : 's'} to your exam`) : done ? `${done} of ${mocks.length} mocks done` : 'Let’s set your baseline with a first mock'}</p></div>
         {exams.length > 1 && <div className="nd-seg" role="group" aria-label="Choose exam">{exams.map((x) => <button key={x.id} className={exam === x.id ? 'on' : ''} aria-pressed={exam === x.id} onClick={() => { setExam(x.id); setFilter('all'); }}>{x.name}</button>)}</div>}
       </header>
+
+      {asg.length > 0 && (
+        <section className="nd-asg" aria-label="Set by your teacher">
+          <h2>Set by your teacher</h2>
+          <ul>{asg.map((a) => {
+            const d = new Date(a.dueAt);
+            return (
+              <li key={a.id} className={a.done ? 'done' : a.overdue ? 'late' : ''}>
+                <div><b>{a.title}</b><span>{a.batch}{a.teacher ? ` · ${a.teacher}` : ''}{a.note ? ` · ${a.note}` : ''}</span></div>
+                <span className="nd-asg-due">{a.done ? (a.late ? 'Done, late' : 'Done') : `${a.overdue ? 'Was due' : 'Due'} ${d.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' })}, ${d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}`}</span>
+                {!a.done && <Link className="btn btn-sm" to={a.link}>{a.kind === 'practice' ? `Practice (${a.sets}/${a.setsNeeded})` : a.started ? 'Continue' : 'Start'}</Link>}
+              </li>
+            );
+          })}</ul>
+        </section>
+      )}
 
       <div className="nd-r1">
         <section className="nd-hero" aria-label="Your next step">

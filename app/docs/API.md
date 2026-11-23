@@ -124,3 +124,7 @@ All under `/api/admin`, admin only unless noted.
 - Support inbox (staff with the support permission): `GET /tickets?status=open|answered|closed&q=&mine=1`, `GET /tickets/:id`, `POST /tickets/:id/reply {body, note?, close?}`, `PATCH /tickets/:id {status?, priority?, assignedTo?}`
 
 Student side: `GET /support`, `POST /support {subject, category, body}`, `GET /support/:id`, `POST /support/:id/reply`, `POST /support/:id/close`, `POST /support/:id/rate {rating}`.
+
+## v19 endpoints
+Admin: `GET /admin/alert-center[?all=1]`, `GET /admin/alert-center/summary`, `POST /admin/alert-center/check`, `POST /admin/alert-center/read {id|'all'}`, `POST /admin/alert-center/:id/snooze {hours}`, `PUT /admin/alert-center/prefs`, `POST /admin/alert-center/test`, `GET|PUT /admin/auto-build`, `POST /admin/auto-build/run`, `GET /admin/assignments`.
+Teacher: `GET|POST /teacher/assignments`, `GET /teacher/assignments/:id`, `POST /teacher/assignments/:id/remind`. Student: `GET /my/assignments`.

@@ -13,17 +13,16 @@ const Delta = ({ c, what = 'yesterday' }) => { const diff = c.today - c.yesterda
 const hello = () => { const h = new Date().getHours(); return h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening'; };
 
 export default function Overview() {
-  const { user } = useAuth(); const { data: d, err, loading, reload } = useLoad('/admin/overview'); const { data: al } = useLoad('/admin/alerts');
-  const [plat, setPlat] = useState([]); const [range, setRange] = useState('signups'); const [days, setDays] = useState(14);
+  const { user } = useAuth(); const { data: d, err, loading, reload } = useLoad('/admin/overview');
+  const [plat, setPlat] = useState([]); const [ac, setAc] = useState(null); const [range, setRange] = useState('signups'); const [days, setDays] = useState(14);
   useEffect(() => { const f = () => api.get('/admin/attention').then((x) => setPlat(x.items)).catch(() => {}); f(); const t = setInterval(f, 30000); return () => clearInterval(t); }, []);
+  useEffect(() => { const f = () => api.get('/admin/alert-center/summary').then(setAc).catch(() => {}); f(); window.addEventListener('ad-alerts', f); const t = setInterval(f, 30000); return () => { clearInterval(t); window.removeEventListener('ad-alerts', f); }; }, []);
   if (loading && !d) return <Loading />; if (err) return <Err>{err}</Err>;
   const t = d.totals; const first = (user?.name || '').split(' ')[0];
   const sig = d.signups.map((x) => x.n); const att = d.attempts.map((x) => x.n);
   const todo = [
     ...plat.map((i) => ({ tone: i.level === 'bad' ? 'bad' : i.level === 'warn' ? 'warn' : 'info', to: `/admin/${i.to}`, text: i.text })),
     t.openReports > 0 && { tone: 'warn', to: '/admin/reports', text: `${t.openReports} student report${t.openReports > 1 ? 's' : ''} to review` },
-    al?.count > 0 && { tone: 'bad', to: '/admin/quality', text: `${al.count} question${al.count > 1 ? 's' : ''} may have a wrong answer key${al.fresh ? ` (${al.fresh} new)` : ''}` },
-    d.flagged.length > 0 && { tone: 'warn', to: '/admin/quality', text: `${d.flagged.length} question${d.flagged.length > 1 ? 's' : ''} almost nobody gets right` },
     d.health.neverStarted > 0 && { tone: 'info', to: '/admin/users?segment=never', text: `${d.health.neverStarted} student${d.health.neverStarted > 1 ? 's' : ''} never took a test` },
     d.health.inactive7 > 0 && { tone: 'info', to: '/admin/users?segment=inactive', text: `${d.health.inactive7} student${d.health.inactive7 > 1 ? 's' : ''} inactive for 7+ days` },
   ].filter(Boolean);
@@ -40,6 +39,13 @@ export default function Overview() {
         </div>
         <div className="dash-act"><Link className="btn pri" to="/admin/mocks">＋ New mock</Link><Link className="btn" to="/admin/messages">📣 Send message</Link><button className="btn" onClick={reload}>↻ Refresh</button></div>
       </section>
+
+      {ac?.items?.length > 0 && (
+        <section className="sx-strip" aria-label="Alerts">
+          <div className="sx-strip-h"><b>{ac.summary.bad ? 'Urgent: ' : ''}{ac.summary.total} alert{ac.summary.total > 1 ? 's' : ''}</b><Link to="/admin/alerts">See all</Link></div>
+          <ul>{ac.items.slice(0, 3).map((x) => <li key={x.id}><Link to={x.link ? `/admin/${x.link}` : '/admin/alerts'}><i className={`sx-dot ${x.level}`} role="img" aria-label={x.level === 'bad' ? 'Urgent' : x.level === 'warn' ? 'Warning' : 'Notice'} /><span><b>{x.title}</b><small>{x.body}</small></span></Link></li>)}</ul>
+        </section>
+      )}
 
       <div className="ad-grid g4">
         <Link className="kpi" to="/admin/users"><span className="l">Students</span><b>{t.users}</b><small>+{t.newWeek} this week <Delta c={d.compare.signups} /></small><Spark data={sig} /></Link>

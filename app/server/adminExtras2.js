@@ -63,4 +63,5 @@ export function mountAdminExtras2({ r, db, now, audit, bad, notifier, computeQua
   };
   r.get('/alerts', (req, res) => { const items = alertList().sort((a, b) => b.worst - a.worst || b.firstSeen - a.firstSeen); res.json({ count: items.length, fresh: items.filter((x) => x.isNew).length, items: items.slice(0, 8) }); });
   r.post('/alerts/:qid/dismiss', (req, res) => { alertCache = { at: 0, items: null }; db.prepare('INSERT INTO quality_alerts(question_id, first_seen, dismissed_at) VALUES (?,?,?) ON CONFLICT(question_id) DO UPDATE SET dismissed_at=excluded.dismissed_at').run(req.params.qid, now(), now()); audit(req, 'alert_dismissed', req.params.qid); res.json({ ok: true }); });
+  return { alertList, resetAlerts: () => { alertCache = { at: 0, items: null }; } };
 }

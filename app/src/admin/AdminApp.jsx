@@ -46,16 +46,19 @@ const Integrations = lazy(() => import('./Integrations.jsx'));
 const ServerTools = lazy(() => import('./ServerTools.jsx'));
 const Calendar = lazy(() => import('./Calendar.jsx'));
 const Support = lazy(() => import('./Support.jsx'));
+const Alerts = lazy(() => import('./Alerts.jsx'));
+const Assignments = lazy(() => import('./Assignments.jsx'));
+import AlertBell from './AlertBell.jsx';
 
 // Eight hubs instead of thirty tabs. Each hub groups related pages; every page keeps its own address.
 const HUBS = [
   { id: '', label: 'Dashboard', icon: '▦', tabs: [['', 'Dashboard']] },
-  { id: 'students', label: 'Students', icon: '👥', tabs: [['users', 'All students'], ['batches', 'Batches'], ['cohorts', 'Cohorts'], ['import-students', 'Import'], ['referrals', 'Referrals']] },
+  { id: 'students', label: 'Students', icon: '👥', tabs: [['users', 'All students'], ['batches', 'Batches'], ['cohorts', 'Cohorts'], ['assignments', 'Assignments'], ['import-students', 'Import'], ['referrals', 'Referrals']] },
   { id: 'tests', label: 'Tests', icon: '🗂', tabs: [['mocks', 'Mocks'], ['calendar', 'Calendar'], ['exams', 'Exams'], ['live', 'Live now'], ['attempts', 'Attempts']] },
   { id: 'questions', label: 'Questions', icon: '❓', tabs: [['bank', 'Question bank'], ['content', 'Import and AI'], ['quality', 'Quality'], ['coverage', 'Coverage'], ['reports', 'Student reports']] },
   { id: 'insights', label: 'Insights', icon: '📊', tabs: [['analytics', 'Analytics'], ['ask', 'Ask your data'], ['integrity', 'Integrity'], ['anomalies', 'Copy check']] },
   { id: 'comms', label: 'Messages', icon: '📣', tabs: [['support', 'Support inbox'], ['messages', 'Send a message'], ['announcements', 'Announcements'], ['notifications', 'Reminder rules']] },
-  { id: 'server', label: 'Server', icon: '🖥', tabs: [['monitor', 'Monitoring'], ['tools', 'Server tools'], ['control', 'Control room'], ['security', 'Security'], ['integrations', 'Integrations'], ['system', 'System'], ['data', 'Data and backup']] },
+  { id: 'server', label: 'Server', icon: '🖥', tabs: [['alerts', 'Alerts'], ['monitor', 'Monitoring'], ['tools', 'Server tools'], ['control', 'Control room'], ['security', 'Security'], ['integrations', 'Integrations'], ['system', 'System'], ['data', 'Data and backup']] },
   { id: 'settings', label: 'Settings', icon: '⚙', tabs: [['settings', 'Settings']] },
 ];
 
@@ -98,7 +101,7 @@ export default function AdminApp() {
         <div className="ad-side-foot"><span>Signed in as <b>{user.name}</b><br /><small>{user.email}</small></span><button className="btn btn-ghost btn-sm" onClick={logout} style={{ color: '#fff', borderColor: 'rgba(255,255,255,.3)', background: 'transparent' }}>Sign out</button></div>
       </aside>
       <main className="ad-main" id="main">
-        <div className="ad-top"><button className="ad-find" onClick={() => setFind(true)} aria-label="Search everything"><span aria-hidden="true">🔍</span><span className="ad-find-t">Search users, mocks, questions…</span><kbd>Ctrl K</kbd></button><span style={{ display: 'flex', gap: 10, alignItems: 'center' }}><ThemeToggle /><button className="btn btn-ghost btn-sm ad-out" onClick={logout}>Sign out</button></span></div>
+        <div className="ad-top"><button className="ad-find" onClick={() => setFind(true)} aria-label="Search everything"><span aria-hidden="true">🔍</span><span className="ad-find-t">Search users, mocks, questions…</span><kbd>Ctrl K</kbd></button><span style={{ display: 'flex', gap: 10, alignItems: 'center' }}>{!editor && <AlertBell />}<ThemeToggle /><button className="btn btn-ghost btn-sm ad-out" onClick={logout}>Sign out</button></span></div>
         <AdminNav hubs={hubs} />
         <HubTabs tabs={(hubs.find(hubOf) || { tabs: [] }).tabs} open={open} sup={sup} />
         <Suspense fallback={<Loading />}>
@@ -124,6 +127,8 @@ export default function AdminApp() {
             <Route path="tools" element={<ServerTools />} />
             <Route path="calendar" element={<Calendar />} />
             <Route path="support" element={<Support />} />
+            <Route path="alerts" element={<Alerts />} />
+            <Route path="assignments" element={<Assignments />} />
             <Route path="monitor" element={<Monitoring />} />
             <Route path="security" element={<Security />} />
             <Route path="integrations" element={<Integrations />} />
