@@ -1,3 +1,4 @@
+import { staminaOf } from './lib/stamina.js';
 import { broadcastDue } from './adminExtras.js';
 import { runCampaigns } from './campaigns.js';
 import { limitsOf, siteOf } from './lib/site.js';
@@ -19,6 +20,7 @@ import { seedFromFiles, loadQuestions, mockRow, parseMock, sectionsFor, segments
 import { adminRouter, UPLOAD_DIR } from './admin.js';
 import { makeFeatures2 } from './features2.js';
 import { makeAssignments } from './assignments.js';
+import { makeTips, mountTipsStudent, mountTipsTeacher } from './tips.js';
 import { makeSettings } from './lib/settings.js';
 import { mountShare, mountSharePublic } from './share.js';
 import { makeDrafter } from './lib/drafter.js';
@@ -114,6 +116,7 @@ export function createApp(db, { allowIncomplete = process.env.MOCKDESK_ALLOW_INC
   const readResult = (r) => upgradeResult(JSON.parse(r.result), allSections());
   const features = makeFeatures({ db, now, settings, notifier, getMock, readResult, iso, exams });
   const assign = makeAssignments({ db, now, notifier, readResult });
+  const tips = makeTips({ db, now, settings, readResult, notifier, controls, getMock });
   const features2 = makeFeatures2({ db, now, iso, notifier, readResult, dropCaches: () => { snaps.clear(); features.clearBoards(); cache.clear(); } });
   app.exams = exams;
   const extras = [digestRunner({ db, notifier }), liveResultsRunner({ db, notifier, board: features.board })];
@@ -410,7 +413,7 @@ export function createApp(db, { allowIncomplete = process.env.MOCKDESK_ALLOW_INC
 
   // Admin accounts are separate from student accounts: they only use /api/admin.
   api.use(['/mocks', '/attempts', '/stats', '/questions', '/practice', '/notebook', '/bookmarks', '/referral', '/batches', '/my', '/inbox', '/push', '/announcements', '/notifications', '/errors', '/fixes', '/share-links', '/support'], (req, res, next) => (['admin', 'editor', 'teacher'].includes(req.user?.role) ? res.status(403).json({ error: 'This account uses its own console, not the student area', code: 'ADMIN_ONLY' }) : next()));
-  features.mount(api); mountSupportStudent({ api, db, now, notifier }); mountShare(api, { db, now }); features.mountTeacher(api); assign.mountTeacher(api); assign.mountStudent(api); features2.mount(api); features2.mountTeacher(api);
+  features.mount(api); mountSupportStudent({ api, db, now, notifier }); mountShare(api, { db, now }); features.mountTeacher(api); assign.mountTeacher(api); assign.mountStudent(api); mountTipsStudent(api, tips, { db, now, notifier }); mountTipsTeacher(api, tips, { db, getMock, publishedMocks: () => db.prepare("SELECT id, name FROM mocks WHERE status='published' AND id NOT IN ('practice','pool') ORDER BY number, created_at").all() }); features2.mount(api); features2.mountTeacher(api);
   api.get('/mocks', (req, res) => {
     const rows = db.prepare('SELECT * FROM attempts WHERE user_id=? ORDER BY started_at DESC').all(req.user.id);
     for (const r of rows) if (r.status === 'in_progress' && mockOf(r)) expire(r);
@@ -520,6 +523,7 @@ export function createApp(db, { allowIncomplete = process.env.MOCKDESK_ALLOW_INC
   });
 
   // ---------- results & history ----------
+  const isPracticeStamina = (r) => { try { return staminaOf(r); } catch { return { available: false }; } };
   api.get('/attempts/:id/result', (req, res) => {
     const a = loadAttempt(req.params.id, req.user.id);
     if (!a) return res.status(404).json({ error: 'Attempt not found' });
@@ -543,7 +547,7 @@ export function createApp(db, { allowIncomplete = process.env.MOCKDESK_ALLOW_INC
     const plain = plainSummary(result, { prevSame: prevSame ? brief(prevSame) : null, prev, community, target: req.user.target_score });
     const mk = mockOf(a);
     const expected = {}; if (mk) for (const sg of mk.segments) { const n = mk.questions.filter((q) => sg.sections.includes(q.section)).length; for (const k of sg.sections) expected[k] = n ? Math.round((sg.minutes * 60) / n) : null; }
-    res.json({ ...result, segments: mk ? mk.segments.map((x) => ({ id: x.id, sections: x.sections, minutes: x.minutes })) : null, expected, teacherNotes: features2.notesFor(a.id), compare: { previous: prev, previousSameMock: prevSame ? brief(prevSame) : null }, community, plain, live: isPractice ? null : features.liveInfo(a), kind: isPractice ? 'practice' : 'mock', doubt: doubtGate(req.user.id, a.mock_id) });
+    res.json({ ...result, stamina: isPracticeStamina(result), segments: mk ? mk.segments.map((x) => ({ id: x.id, sections: x.sections, minutes: x.minutes })) : null, expected, teacherNotes: features2.notesFor(a.id), compare: { previous: prev, previousSameMock: prevSame ? brief(prevSame) : null }, community, plain, live: isPractice ? null : features.liveInfo(a), kind: isPractice ? 'practice' : 'mock', doubt: doubtGate(req.user.id, a.mock_id) });
   });
   // ---------- free doubt helper (one question at a time) ----------
   const lim = () => limitsOf(settings); // doubt and practice limits are set in Admin > Settings
@@ -652,7 +656,7 @@ export function createApp(db, { allowIncomplete = process.env.MOCKDESK_ALLOW_INC
   jobs.reg('backup', 'Database backup', 'every 10 min (runs when due)', () => { const b = runBackup({ db, now, settings }); return b ? `Saved ${b.name}` : 'Not due yet'; });
   jobs.reg('assignments', 'Assignment reminders', 'every 10 min', async () => `Sent ${await assign.run()} reminder(s)`);
   jobs.reg('cleanup', 'Tidy expired sign-ins and codes', 'every 10 min', () => { const t = now(); db.prepare('DELETE FROM sessions WHERE expires_at<?').run(t); db.prepare("DELETE FROM otps WHERE expires_at<? AND expires_at>0").run(t - 86400000); db.prepare('DELETE FROM login_log WHERE at<?').run(t - 90 * 86400000); });
-  api.use('/admin', (req, res, next) => (['admin', 'editor'].includes(req.user.role) ? next() : res.status(403).json({ error: 'Admin access only' })), adminRouter({ assign, exitFn, drafter, db, now, invalidate, getMock, readResult, hashPw, iso, settings, notifier, features, features2, exams, runReminders: runRem, mailer, jobs, metrics, controls, creds, live, otpSender, whatsapp }));
+  api.use('/admin', (req, res, next) => (['admin', 'editor'].includes(req.user.role) ? next() : res.status(403).json({ error: 'Admin access only' })), adminRouter({ tips, assign, exitFn, drafter, db, now, invalidate, getMock, readResult, hashPw, iso, settings, notifier, features, features2, exams, runReminders: runRem, mailer, jobs, metrics, controls, creds, live, otpSender, whatsapp }));
 
   api.use((req, res) => res.status(404).json({ error: 'Not found' }));
   app.use('/api', api);

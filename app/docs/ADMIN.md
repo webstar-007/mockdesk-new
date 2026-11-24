@@ -179,3 +179,9 @@ All of these are in the admin console. Open **Server** for the tools, **Tests > 
 **Team activity** (*Settings > Team activity*). Lists admins, staff and teachers with last activity, devices signed in and changes in the last 7 days. Click a name for their recent changes and sign-ins. *Sign out* ends their sessions; *Lock* also stops them signing in until you *Unlock*. *Lock all staff and teachers* is the emergency button; it never touches admins. You cannot lock yourself or the last active admin.
 
 **Branding** (*Settings > Site and limits > Logo and colour*). Logo (PNG, JPG, WebP or GIF, uploaded here), brand colour (a dark colour such as #0f766e) and a footer line. Clear a field to go back to the default. Changes show within a minute.
+
+
+## v21: Help, Tricks and Load test
+**Help.** Top bar button or Help in the side menu. Type a question; use `/` to jump to the box. Staff with content access can use it. The Missing answers tab lists questions it could not answer.
+**Tricks (Questions > Tricks).** Review student shortcuts: hide, restore, verify or delete, and set who may post (top percent, minimum students, tips per question, per day, reports to auto-hide).
+**Load test (Server > Server tools > Load test).** Choose students, length, autosave interval, mock. Needs the platform out of maintenance mode. Start requires confirmation; Stop ends it early. Reports and history are kept; "Clear history" removes them. Test accounts end in `@loadtest.invalid` and are deleted automatically.

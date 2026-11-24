@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import StaminaCard from '../components/StaminaCard.jsx';
 import { Link, useParams } from 'react-router-dom';
 import { api } from '../lib/api.js';
 import { BarChart } from '../components/Charts.jsx';
@@ -117,6 +118,9 @@ export default function ResultPage() {
         {d.sections.concat(qual).map((sec) => { const qs = d.questions.filter((q) => q.section === sec.key); const mx = Math.max(60, ...qs.map((q) => q.timeSec)); return (
           <div className="tl-row" key={sec.key}><span className="tl-label">{sec.short}</span><div className="tl-bars">{qs.map((q) => <Link key={q.id} to={`/review/${attemptId}?qid=${q.id}`} className={`r-${q.status}`} style={{ height: `${Math.max(6, (q.timeSec / mx) * 100)}%` }} {...tip({ t: `${sec.short} · Question ${q.index + 1}`, v: q.status === 'correct' ? 'Correct' : q.status === 'incorrect' ? 'Incorrect' : 'Not attempted', tone: q.status === 'correct' ? 'good' : q.status === 'incorrect' ? 'bad' : 'mute', rows: [['Time spent', duration(q.timeSec)], ...(q.topic ? [['Topic', q.topic]] : []), ...(q.difficulty ? [['Difficulty', q.difficulty]] : [])], hint: 'Click to open the solution' })} aria-label={`${sec.short} question ${q.index + 1}, ${q.status}, ${duration(q.timeSec)}`} />)}</div></div>); })}
         <ul className="marks-legend"><li><i className="r-correct" />Correct</li><li><i className="r-incorrect" />Incorrect</li><li><i className="r-unattempted" />Unattempted</li></ul></div>
+
+      <h2>Stamina and panic streaks</h2>
+      <StaminaCard s={d.stamina} attemptId={attemptId} />
 
       <h2>Topic-by-topic</h2>
       <div className="tbl-wrap card nopad"><table className="dtable topics">

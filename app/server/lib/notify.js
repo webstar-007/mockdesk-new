@@ -94,6 +94,7 @@ export function createNotifier({ db, now, settings, mailer = null, pusher = null
     const ch = { inapp: true, push: true, email: true, whatsapp: false, ...channels };
     const u = db.prepare('SELECT id, name, email, phone, status, notify_prefs FROM users WHERE id=?').get(userId);
     if (!u || u.status === 'suspended') return { skipped: 'no such active user' };
+    if (/@loadtest\.invalid$/.test(u.email || '')) return { skipped: 'load test user' };
     const prefs = prefsOf(u); const out = {}; const lim = limits();
     const show = ch.inapp && prefs.inapp;
     const r = db.prepare('INSERT OR IGNORE INTO notifications(user_id,kind,title,body,link,created_at,ref,campaign_id,hidden) VALUES (?,?,?,?,?,?,?,?,?)').run(userId, kind, title, body, link, now(), ref, campaignId, show ? 0 : 1);

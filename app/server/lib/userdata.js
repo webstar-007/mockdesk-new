@@ -2,7 +2,7 @@
 const KEYS = ['user_id', 'student_id', 'referrer_id', 'friend_id'];
 const SKIP_EXPORT = new Set(['sessions', 'otps', 'push_subs']);
 const colsOf = (db, t) => db.prepare(`PRAGMA table_info(${t})`).all().map((c) => c.name);
-function owned(db) {
+export function owned(db) {
   const out = [];
   for (const { name } of db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'").all()) {
     if (name === 'users' || name === 'audit') continue;

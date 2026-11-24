@@ -9,7 +9,7 @@ export const PERMS = [
 ];
 export const PRESETS = [['Content editor', ['content']], ['Analyst', ['content', 'students', 'data']], ['Support', ['content', 'students', 'contacts', 'accounts', 'messages', 'support']]];
 // Which permission opens each admin page. Pages not listed here are for admins only.
-export const NAV_PERM = { '': 'students', users: 'students', attempts: 'students', integrity: 'students', anomalies: 'students', cohorts: 'students', live: 'students', analytics: 'students', referrals: 'students', batches: 'students', announcements: 'messages', messages: 'messages', notifications: 'messages', mocks: 'content', bank: 'content', content: 'content', quality: 'content', coverage: 'content', reports: 'content', calendar: 'content', support: 'support', 'import-students': 'accounts', data: 'data' };
+export const NAV_PERM = { help: 'content', '': 'students', users: 'students', attempts: 'students', integrity: 'students', anomalies: 'students', cohorts: 'students', live: 'students', analytics: 'students', referrals: 'students', batches: 'students', announcements: 'messages', messages: 'messages', notifications: 'messages', mocks: 'content', bank: 'content', content: 'content', quality: 'content', coverage: 'content', reports: 'content', calendar: 'content', support: 'support', 'import-students': 'accounts', data: 'data' };
 export function PermPicker({ value, onChange }) {
   const has = (k) => k === 'content' || value.includes(k);
   const toggle = (k) => onChange(has(k) ? value.filter((x) => x !== k) : [...value, k]);

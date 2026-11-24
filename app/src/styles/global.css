@@ -175,3 +175,27 @@ p.muted[role=status]{animation:pulse 1.2s ease-in-out infinite}
 
 .brand-mark.has-logo{background:transparent;overflow:hidden}.brand-mark.has-logo img{width:100%;height:100%;object-fit:contain;display:block}
 .ad-brand .brand-mark.has-logo{background:#fff}
+
+/* stamina curve */
+.st-card h3{margin-top:0}.st-card h4{margin:18px 0 8px}
+.st-verdict{border-left:4px solid var(--good);background:var(--good-soft);padding:10px 14px;border-radius:8px;margin:8px 0 12px}.st-verdict p{margin:4px 0 0}.st-verdict.t-bad{border-color:var(--bad);background:var(--bad-soft)}.st-verdict.t-warn{border-color:var(--warn);background:var(--warn-soft)}
+.st-cells{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px}.st-cell{display:grid;gap:2px;border:1px solid var(--line);border-radius:10px;padding:10px 12px}.st-cell b{font-size:1.5rem}
+.st-svg{width:100%;height:auto;display:block}.st-grid{stroke:var(--line);stroke-width:1}.st-ax{fill:var(--muted);font-size:11px}.st-min{opacity:.75}
+.st-bar{fill:var(--brand);opacity:.18}.st-final{fill:var(--bad);opacity:.07}.st-line{fill:none;stroke:var(--brand);stroke-width:2.5;stroke-linejoin:round}.st-dot{fill:var(--surface);stroke:var(--brand);stroke-width:2.5}
+.st-leg i{display:inline-block;width:14px;height:10px;border-radius:2px;margin-right:6px}.st-key-line{background:var(--brand)}.st-key-bar{background:var(--brand);opacity:.25}.st-key-final{background:var(--bad);opacity:.2}
+.st-streaks{list-style:none;margin:0;padding:0;display:grid;gap:6px}.st-streaks li{display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:baseline;padding:8px 10px;border:1px solid var(--line);border-radius:8px}.st-streaks li.late{border-color:var(--bad)}.st-streaks span{color:var(--muted);font-size:.9rem}.st-streaks em{font-style:normal;color:var(--bad);font-weight:700}
+.st-tips{margin:12px 0 4px;padding-left:20px}.st-tips li{margin:4px 0}
+@media(max-width:520px){.st-streaks li{grid-template-columns:1fr auto}.st-streaks span{grid-column:1/-1;order:3}}
+
+/* topper trick corner */
+.tc-corner{margin:16px 0;padding:14px 16px;border:1px solid var(--line);border-radius:12px;background:var(--surface)}
+.tc-corner header{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:8px}.tc-corner h3{margin:0;font-size:1rem}
+.tc-corner ul{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.tc-corner li{display:grid;grid-template-columns:auto 1fr auto;gap:12px;align-items:start;padding:10px;border:1px solid var(--line);border-radius:10px}.tc-corner li.ver{border-color:var(--good);background:var(--good-soft)}
+.tc-vote{display:grid;justify-items:center;gap:0;min-width:44px;padding:6px 8px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--muted);cursor:pointer;font:inherit;line-height:1.2}.tc-vote.on{background:var(--brand-soft);border-color:var(--brand);color:var(--brand-2)}.tc-vote:disabled{opacity:.55;cursor:default}
+.tc-body p{margin:0 0 4px;font-weight:600;overflow-wrap:anywhere}
+.tc-badge{display:inline-block;margin-left:6px;padding:1px 8px;border-radius:99px;font-size:.75rem;font-weight:700;background:var(--brand-soft);color:var(--brand-2)}.tc-badge.teacher{background:var(--warn-soft);color:var(--warn)}.tc-badge.ok{background:var(--good-soft);color:var(--good)}
+.tc-x{background:none;border:0;color:var(--muted);font:inherit;font-size:.8rem;cursor:pointer;text-decoration:underline}
+.tc-form{margin-top:12px;display:grid;gap:6px}.tc-form label{font-weight:600}.tc-form>div{display:flex;gap:8px}.tc-form input{flex:1;min-width:0}
+.tc-note{color:var(--good)}
+@media(max-width:520px){.tc-corner li{grid-template-columns:auto 1fr}.tc-x{grid-column:2}.tc-form>div{flex-direction:column}}

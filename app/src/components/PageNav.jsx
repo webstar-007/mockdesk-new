@@ -58,6 +58,7 @@ export function studentTrail(p) {
 export function teacherTrail(p) {
   const seg = p.split('/').filter(Boolean).slice(1); const d = ['Dashboard', '/teacher'];
   if (!seg.length) return null;
+  if (seg[0] === 'tricks') return [d, ['Topper tricks', '/teacher/tricks']];
   if (seg[0] === 'assignments') return seg.length === 1 ? [d, ['Assignments', '/teacher/assignments']] : [d, ['Assignments', '/teacher/assignments'], ['Assignment', p]];
   if (seg.length === 1) return [d, ['Batch', `/teacher/${seg[0]}`]];
   return [d, ['Batch', `/teacher/${seg[0]}`], ['Student', `/teacher/${seg[0]}/${seg[1]}`]];

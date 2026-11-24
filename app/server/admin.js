@@ -16,6 +16,9 @@ import { mountOps } from './ops.js';
 import { mountControl } from './control.js';
 import { mountAlertCentre } from './alertcentre.js';
 import { mountTeam } from './team.js';
+import { mountLoadTest } from './loadtest.js';
+import { mountHelp } from './help.js';
+import { mountTipsAdmin } from './tips.js';
 import { mountTools } from './tools.js';
 import { eraseUser } from './lib/userdata.js';
 import { mountSupportAdmin } from './support.js';
@@ -73,7 +76,7 @@ export function cleanQuestion(body, { partial = false, strictOptions = false } =
   return { section, q, errors };
 }
 
-export function adminRouter({ assign, exitFn, drafter = null, db, now, invalidate, getMock, readResult, hashPw, settings, notifier, features, features2, runReminders, exams, mailer = null, jobs, metrics, controls, creds, live, otpSender, whatsapp = null }) {
+export function adminRouter({ tips, assign, exitFn, drafter = null, db, now, invalidate, getMock, readResult, hashPw, settings, notifier, features, features2, runReminders, exams, mailer = null, jobs, metrics, controls, creds, live, otpSender, whatsapp = null }) {
   const r = express.Router();
   // Admins can do everything. Staff (role "editor") get the content tools plus whatever permissions an admin ticked for them.
   r.use((req, res, next) => {
@@ -765,7 +768,10 @@ export function adminRouter({ assign, exitFn, drafter = null, db, now, invalidat
 
   qx = mountAdminExtras({ r, db, now, audit, bad, results, settings, notifier, features, runReminders, page });
   mountAlertCentre({ r, db, now, audit, bad, settings, notifier, mailer, whatsapp, jobs, recentErrors, qx, assign, exams, BUILTIN_ID, runBuild, bust });
+  mountHelp({ r, db, now, audit, bad, jobs });
+  mountLoadTest({ r, db, now, audit, bad, settings, getMock, controls, jobs });
   mountTeam({ r, db, now, audit, bad, jobs });
+  mountTipsAdmin(r, tips, { db, now, audit, bad, jobs, settings });
   mountControl({ r, db, now, audit, bad, settings, notifier, mailer, creds, live, drafter, otpSender, whatsapp, jobs, metrics, controlsCache: controls, recentErrors });
   mountOps({ r, db, now, audit, bad, results, settings, notifier, page });
   mountTools({ r, db, now, audit, bad, settings, exitFn });

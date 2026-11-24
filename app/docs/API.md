@@ -131,3 +131,11 @@ Teacher: `GET|POST /teacher/assignments`, `GET /teacher/assignments/:id`, `POST 
 
 ## v20 endpoints
 Admin only: `GET /admin/team`, `GET /admin/team/:id`, `POST /admin/team/:id/lock {reason}`, `POST /admin/team/:id/unlock`, `POST /admin/team/:id/signout`, `POST /admin/team/lock-all`. `PUT /admin/site` accepts `logoUrl`, `accent`, `footerText`; `GET /public/site` returns them.
+
+
+## v21 endpoints
+Student: `GET/POST /attempts/:id/tips`, `POST /tips/:id/vote`, `POST /tips/:id/report`, `DELETE /tips/:id`. The `GET /attempts/:id/result` response now includes `stamina`.
+Teacher: `GET/POST /teacher/tips`, `POST /teacher/tips/:id/verify`, `DELETE /teacher/tips/:id`, `GET /teacher/tips/mocks`, `GET /teacher/tips/mocks/:id/questions`.
+Admin: `GET /admin/tips`, `PUT /admin/tips/config`, `POST /admin/tips/:id/{hide|unhide|verify|delete}`.
+Admin load test: `GET /admin/loadtest`, `POST /admin/loadtest/start` (body needs `confirm:"start"`), `POST /admin/loadtest/stop`, `DELETE /admin/loadtest/history`.
+Admin help: `GET /admin/help`, `POST /admin/help/ask`, `GET /admin/help/topic/:id`, `GET /admin/help/area/:name`, `GET /admin/help/page?path=`, `POST /admin/help/feedback`, `GET /admin/help/gaps`, `DELETE /admin/help/history`.

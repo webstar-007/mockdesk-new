@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../lib/api.js';
+import LoadTest from './LoadTest.jsx';
 import { Badge, ConfirmModal, Empty, Err, Loading, PageHead, Stat, ago, dt, toast, useLoad } from './ui.jsx';
 
 const bytes = (b) => (b == null ? '–' : b > 1073741824 ? `${(b / 1073741824).toFixed(1)} GB` : b > 1048576 ? `${(b / 1048576).toFixed(1)} MB` : `${Math.max(0, Math.round(b / 1024))} KB`);
 const span = (s) => { const d = Math.floor(s / 86400), h = Math.floor((s % 86400) / 3600), m = Math.floor((s % 3600) / 60); return d ? `${d}d ${h}h` : h ? `${h}h ${m}m` : `${m}m`; };
-const TABS = [['overview', 'Overview'], ['database', 'Database'], ['logs', 'Logs'], ['new', 'What’s new']];
+const TABS = [['overview', 'Overview'], ['database', 'Database'], ['logs', 'Logs'], ['load', 'Load test'], ['new', 'What’s new']];
 
 export default function ServerTools() {
   const [tab, setTab] = useState('overview');
@@ -13,7 +14,7 @@ export default function ServerTools() {
     <>
       <PageHead title="Server tools" sub="Restart the app, look after the database, read recent logs and see which version is running." />
       <nav className="ad-tabs" aria-label="Server tools">{TABS.map(([k, l]) => <button key={k} type="button" className={tab === k ? 'on' : ''} aria-pressed={tab === k} onClick={() => setTab(k)}>{l}</button>)}</nav>
-      {tab === 'overview' && <Overview />}{tab === 'database' && <Database />}{tab === 'logs' && <Logs />}{tab === 'new' && <WhatsNew />}
+      {tab === 'overview' && <Overview />}{tab === 'database' && <Database />}{tab === 'logs' && <Logs />}{tab === 'load' && <LoadTest />}{tab === 'new' && <WhatsNew />}
     </>
   );
 }

@@ -21,7 +21,7 @@ export function permsOf(user) {
   let p = []; try { p = JSON.parse(user.perms || '[]'); } catch { /* default */ }
   return cleanPerms(p);
 }
-const CONTENT = /^\/(meta|upload|search|coverage|import\/parse)$|^\/(mocks|questions|reports|alerts|drafts|duplicates|quality)(\/|$)/;
+const CONTENT = /^\/(meta|upload|search|coverage|import\/parse)$|^\/(mocks|questions|reports|alerts|drafts|duplicates|quality|tips|help)(\/|$)/;
 /** Which permission a request needs: one of PERMS, or 'admin' (admins only). */
 export function needFor(method, path) {
   const get = method === 'GET' || method === 'HEAD';

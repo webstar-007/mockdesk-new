@@ -5,6 +5,7 @@ export const FEATURES = {
   shareLinks: 'Parent progress links',
   notebook: 'Mistake notebook and bookmarks',
   support: 'Support inbox (students can write to you)',
+  tips: 'Topper Trick Corner (one-line tips under questions)',
 };
 export const CONTROL_DEFAULTS = {
   maintenance: { mode: 'off', message: '' },            // off | soft (no new tests or sign-ups) | hard (students locked out)
