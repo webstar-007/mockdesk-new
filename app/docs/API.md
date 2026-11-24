@@ -139,3 +139,5 @@ Teacher: `GET/POST /teacher/tips`, `POST /teacher/tips/:id/verify`, `DELETE /tea
 Admin: `GET /admin/tips`, `PUT /admin/tips/config`, `POST /admin/tips/:id/{hide|unhide|verify|delete}`.
 Admin load test: `GET /admin/loadtest`, `POST /admin/loadtest/start` (body needs `confirm:"start"`), `POST /admin/loadtest/stop`, `DELETE /admin/loadtest/history`.
 Admin help: `GET /admin/help`, `POST /admin/help/ask`, `GET /admin/help/topic/:id`, `GET /admin/help/area/:name`, `GET /admin/help/page?path=`, `POST /admin/help/feedback`, `GET /admin/help/gaps`, `DELETE /admin/help/history`.
+
+Load test additions: `GET /admin/loadtest/report/:id`, `PUT /admin/loadtest/report/:id` (label, note, pinned), `DELETE /admin/loadtest/report/:id`, `GET /admin/loadtest/compare?a=&b=`, `GET/POST /admin/loadtest/presets`, `DELETE /admin/loadtest/presets/:id`. `POST /admin/loadtest/start` also accepts `pattern` (steady|spike|ramp), `rampSec`, `jitter`, `saveSize`, `markPct`, `pollPct`, `resultPct`, `submitSpreadPct`, `errStopPct`, `label`, `note`. `DELETE /admin/loadtest/history` keeps pinned results.

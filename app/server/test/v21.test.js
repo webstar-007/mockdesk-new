@@ -168,3 +168,39 @@ test('help: every topic links only to pages that exist and related ids are real'
   }
   assert.ok(KB.length >= 60);
 });
+
+test('load test v2: custom settings are clamped, results are saved, compared, labelled and pinned', async () => {
+  const { parseCfg, compareOf, curveOf, limitOf, scorecardOf } = await import('../loadtest.js');
+  const c = parseCfg({ users: 9999, durationSec: 1, pattern: 'weird', jitter: 500, errStopPct: 1, rampSec: 999, label: '  Before Sunday  ' });
+  assert.equal(c.users, 500); assert.equal(c.durationSec, 5); assert.equal(c.pattern, 'steady'); assert.equal(c.jitter, 80); assert.equal(c.errStopPct, 10); assert.equal(c.rampSec, 5); assert.equal(c.label, 'Before Sunday');
+  assert.equal(parseCfg({ pattern: 'spike', durationSec: 60 }).rampSec, 1); assert.equal(parseCfg({ pattern: 'ramp', durationSec: 50 }).rampSec, 40);
+  // the curve and the measured limit
+  const smp = []; for (let t = 1; t <= 40; t++) smp.push({ phase: 'running', users: t * 5, rps: 10, p95: t < 25 ? 100 : 3000, errors: 0, cpuProc: t * 2 });
+  const cv = curveOf(smp); assert.ok(cv.length >= 4); const lim = limitOf(cv); assert.ok(lim.users >= 100 && lim.users < 200 && !lim.atLeast, JSON.stringify(lim));
+  // compare two synthetic reports
+  const mk = (users, p95, err) => ({ config: { users, durationSec: 60, pattern: 'steady' }, kinds: { save: { p95, p50: 10, max: p95 * 2 } }, totals: { p99: p95, max: p95, errorPct: err, peakRps: 10 }, peaks: { cpuProc: 50, cpuSys: 20, memUsedPct: 40, rssMB: 100, writeMs: 5, lagMs: 20, diskUsedPct: 30 }, dbGrowthMB: 1, score: 90 });
+  const cmp = compareOf(mk(100, 800, 2), mk(100, 400, 0)); assert.equal(cmp.rows.find((r) => r.key === 'save').verdict, 'better'); assert.equal(cmp.rows.find((r) => r.key === 'err').verdict, 'better'); assert.ok(cmp.better > cmp.worse); assert.ok(cmp.sameSetup);
+  assert.equal(compareOf(mk(100, 400, 0), mk(200, 400, 0)).sameSetup, false);
+  assert.ok(scorecardOf(mk(100, 3000, 10)).some((r) => r.status === 'bad'));
+  // real runs: two saved tests, compared
+  const i = (await call('boss', 'GET', '/admin/loadtest')).body; const mid = i.info.mocks[0].id;
+  const run = async (body) => { assert.equal((await call('boss', 'POST', '/admin/loadtest/start', { confirm: 'start', mockId: mid, durationSec: 6, saveEverySec: 3, progress: 20, ...body })).status, 202); let g; for (let n = 0; n < 90; n++) { await new Promise((r) => setTimeout(r, 400)); g = (await call('boss', 'GET', '/admin/loadtest')).body; if (['done', 'failed'].includes(g.run?.phase)) break; } assert.equal(g.run.phase, 'done', g.run.error); return g.run.report; };
+  const a = await run({ users: 4, label: 'Baseline', note: 'before the upgrade' });
+  const b = await run({ users: 8, pattern: 'ramp', label: 'Ramp run', jitter: 0, saveSize: 1, resultPct: 100, pollPct: 0 });
+  assert.equal(a.label, 'Baseline'); assert.equal(b.config.pattern, 'ramp'); assert.equal(b.config.saveSize, 1); assert.ok(b.kinds.result.n === 8, 'resultPct 100 means everyone opens their result');
+  for (const r of [a, b]) { assert.ok(r.score >= 0 && r.score <= 100); assert.ok(r.scorecard.length >= 6); assert.ok(r.plain.length >= 2); assert.ok(r.bottleneck.key); assert.ok(r.samples.length >= 3 && r.samples.length <= 90); assert.ok(r.events.length >= 2); }
+  assert.ok(Array.isArray(b.curve)); assert.deepEqual(a.curve, []);
+  const h = (await call('boss', 'GET', '/admin/loadtest')).body.history; assert.ok(h.length >= 2); assert.ok(h.find((x) => x.id === a.id).hasReport);
+  const cm = (await call('boss', 'GET', `/admin/loadtest/compare?a=${a.id}&b=${b.id}`)).body; assert.ok(cm.rows.length >= 8); assert.ok(cm.headline); assert.equal(cm.sameSetup, false); assert.ok(cm.diffs.some((d) => d.label === 'students')); assert.ok(cm.caution);
+  assert.equal((await call('boss', 'GET', `/admin/loadtest/compare?a=${a.id}&b=${a.id}`)).status, 400); assert.equal((await call('boss', 'GET', `/admin/loadtest/compare?a=${a.id}&b=nope`)).status, 404);
+  const pin = await call('boss', 'PUT', `/admin/loadtest/report/${a.id}`, { label: 'Baseline v2', pinned: true }); assert.equal(pin.body.item.label, 'Baseline v2'); assert.ok(pin.body.item.pinned);
+  assert.equal((await call('boss', 'GET', `/admin/loadtest/report/${a.id}`)).body.report.label, 'Baseline v2');
+  // presets
+  assert.equal((await call('boss', 'POST', '/admin/loadtest/presets', { name: '' })).status, 400);
+  const pr = (await call('boss', 'POST', '/admin/loadtest/presets', { name: 'Sunday exam', config: { users: 300, durationSec: 90, pattern: 'spike' } })).body.presets; assert.equal(pr[0].config.users, 300); assert.equal(pr[0].config.pattern, 'spike');
+  assert.equal((await call('boss', 'DELETE', `/admin/loadtest/presets/${pr[0].id}`)).body.presets.length, 0);
+  // clearing history keeps pinned, deleting removes one
+  await call('boss', 'DELETE', '/admin/loadtest/history'); const left = (await call('boss', 'GET', '/admin/loadtest')).body.history; assert.deepEqual(left.map((x) => x.id), [a.id]);
+  await call('boss', 'DELETE', `/admin/loadtest/report/${a.id}`); assert.equal((await call('boss', 'GET', '/admin/loadtest')).body.history.length, 0); assert.equal((await call('boss', 'GET', `/admin/loadtest/report/${a.id}`)).status, 404);
+  assert.equal(db.prepare("SELECT COUNT(*) c FROM users WHERE email LIKE '%@loadtest.invalid'").get().c, 0);
+});

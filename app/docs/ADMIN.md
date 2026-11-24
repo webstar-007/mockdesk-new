@@ -185,3 +185,5 @@ All of these are in the admin console. Open **Server** for the tools, **Tests > 
 **Help.** Top bar button or Help in the side menu. Type a question; use `/` to jump to the box. Staff with content access can use it. The Missing answers tab lists questions it could not answer.
 **Tricks (Questions > Tricks).** Review student shortcuts: hide, restore, verify or delete, and set who may post (top percent, minimum students, tips per question, per day, reports to auto-hide).
 **Load test (Server > Server tools > Load test).** Choose students, length, autosave interval, mock. Needs the platform out of maintenance mode. Start requires confirmation; Stop ends it early. Reports and history are kept; "Clear history" removes them. Test accounts end in `@loadtest.invalid` and are deleted automatically.
+
+**Load test round 2.** Saved results: Server > Server tools > Load test > Saved results. Tick two and press Compare the two. Pin keeps a test beyond the last 15; Clear unpinned removes the rest. Presets (More settings) store a setup for reuse. "Gradual climb" gives a measured limit.
