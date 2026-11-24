@@ -242,7 +242,7 @@ export function mountLoadTest({ r, db, now, audit, bad, settings, getMock, contr
       const sorted = win.lat.slice().sort((a, b) => a - b); const lagMs = lag.percentile(99) / 1e6; lag.reset();
       const win0 = win.n; const s = { t: r1(tt), rps: win.n, p50: r1(pct(sorted, 50)), p95: r1(pct(sorted, 95)), errors: win.err, users: run.active, cpuProc: r1(cpuProc), cpuSys: r1(cpuSys), rss: mu.rss, heap: mu.heapUsed, memUsedPct: r1(((mem.total - mem.avail) / mem.total) * 100), memAvail: mem.avail, diskUsedPct: dsk2?.usedPct ?? null, dbBytes: sizeOf(file()) + sizeOf(`${file()}-wal`), writeMs: r1(writeMs), lagMs: r1(lagMs), phase: run.phase };
       win.n = 0; win.err = 0; win.lat = []; samples.push(s);
-      peaks.cpuProc = Math.max(peaks.cpuProc, s.cpuProc); peaks.cpuSys = Math.max(peaks.cpuSys, s.cpuSys); peaks.rss = Math.max(peaks.rss, s.rss); peaks.heap = Math.max(peaks.heap, s.heap); peaks.memUsedPct = Math.max(peaks.memUsedPct, s.memUsedPct); peaks.diskUsedPct = Math.max(peaks.diskUsedPct, s.diskUsedPct || 0); peaks.writeMs = Math.max(peaks.writeMs, s.writeMs); peaks.lagMs = Math.max(peaks.lagMs, s.lagMs); peaks.rps = Math.max(peaks.rps, s.rps);
+      if (run.phase === 'running') { peaks.cpuProc = Math.max(peaks.cpuProc, s.cpuProc); peaks.cpuSys = Math.max(peaks.cpuSys, s.cpuSys); peaks.rss = Math.max(peaks.rss, s.rss); peaks.heap = Math.max(peaks.heap, s.heap); peaks.memUsedPct = Math.max(peaks.memUsedPct, s.memUsedPct); peaks.diskUsedPct = Math.max(peaks.diskUsedPct, s.diskUsedPct || 0); peaks.writeMs = Math.max(peaks.writeMs, s.writeMs); peaks.lagMs = Math.max(peaks.lagMs, s.lagMs); peaks.rps = Math.max(peaks.rps, s.rps); } // set-up of the accounts is not exam load
       run.samples = samples; run.elapsed = r1(tt);
       const once = (k, text, level) => { if (!flags[k]) { flags[k] = 1; run.events.push({ t: r1(tt), text, level }); } };
       if (run.phase === 'running') {
@@ -273,7 +273,9 @@ export function mountLoadTest({ r, db, now, audit, bad, settings, getMock, contr
         await hit('open', 'GET', `/attempts/${s.aid}`, s.sid);
         let cum = 0;
         while (!stop && performance.now() < (cfg.submitAtEnd ? submitFrom : tEnd) - 200) {
-          await sleep(Math.min(cfg.saveEverySec * 1000 * (1 - cfg.jitter / 100 + Math.random() * 2 * (cfg.jitter / 100)), Math.max(0, (cfg.submitAtEnd ? submitFrom : tEnd) - performance.now())));
+          const wait = cfg.saveEverySec * 1000 * (1 - cfg.jitter / 100 + Math.random() * 2 * (cfg.jitter / 100)); const limit = cfg.submitAtEnd ? submitFrom : tEnd;
+          if (performance.now() + wait > limit - 200) break; // the next save would fall after the end: do not fire it, or every student saves in the same instant
+          await sleep(wait);
           if (stop) break;
           const body = { responses: {}, lastQid: null }; const n = 1 + Math.floor(Math.random() * cfg.saveSize);
           for (let k = 0; k < n; k++) { const q = segQs[Math.floor(Math.random() * segQs.length)]; cum += 8000 + Math.floor(Math.random() * 30000); body.responses[q.id] = { selected: Math.floor(Math.random() * 4), marked: Math.random() * 100 < cfg.markPct, visited: true, timeMs: cum }; body.lastQid = q.id; }
