@@ -1,4 +1,5 @@
 import { useSite } from '../lib/site.js';
+import BrandMark from '../components/BrandMark.jsx';
 import { useEffect, useState } from 'react';
 import { Link, Navigate, Route, Routes, useLocation, useParams } from 'react-router-dom';
 import { api } from '../lib/api.js';
@@ -169,7 +170,7 @@ export default function TeacherApp() {
   if (user?.role !== 'teacher') return <Navigate to="/" replace />;
   return (
     <div className="tc">
-      <header className="topbar"><div className="topbar-in"><Link to="/teacher" className="brand"><span className="brand-mark" aria-hidden="true">✓</span><span>{site.name} <small className="muted">Teacher</small></span></Link><div className="topbar-user"><Link className="btn btn-ghost btn-sm" to="/teacher/assignments">Assignments</Link><ThemeToggle /><span className="who">{user.name}</span><button className="btn btn-ghost btn-sm" onClick={logout}>Sign out</button></div></div></header>
+      <header className="topbar"><div className="topbar-in"><Link to="/teacher" className="brand"><BrandMark /><span>{site.name} <small className="muted">Teacher</small></span></Link><div className="topbar-user"><Link className="btn btn-ghost btn-sm" to="/teacher/assignments">Assignments</Link><ThemeToggle /><span className="who">{user.name}</span><button className="btn btn-ghost btn-sm" onClick={logout}>Sign out</button></div></div></header>
       <main className="shell" id="main"><TeacherNav /><Routes><Route index element={<Batches />} /><Route path="assignments" element={<AssignmentList />} /><Route path="assignments/:id" element={<AssignmentDetail />} /><Route path=":id" element={<Batch />} /><Route path=":id/:uid" element={<Student />} /><Route path="*" element={<Navigate to="/teacher" replace />} /></Routes></main>
     </div>
   );

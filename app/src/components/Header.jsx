@@ -1,4 +1,5 @@
 import { Link, NavLink } from 'react-router-dom';
+import BrandMark from './BrandMark.jsx';
 import { useAuth } from '../lib/auth.jsx';
 import ThemeToggle from './ThemeToggle.jsx';
 import InboxBell from './InboxBell.jsx';
@@ -9,7 +10,7 @@ export default function Header() {
   return (
     <header className="topbar">
       <div className="topbar-in">
-        <Link to="/" className="brand" aria-label={`${site.name} home`}><span className="brand-mark" aria-hidden="true">✓</span><span>{site.name}</span></Link>
+        <Link to="/" className="brand" aria-label={`${site.name} home`}><BrandMark /><span>{site.name}</span></Link>
         <nav aria-label="Main">
           <NavLink to="/" end>Dashboard</NavLink>
           <NavLink to="/notebook">Notebook</NavLink>

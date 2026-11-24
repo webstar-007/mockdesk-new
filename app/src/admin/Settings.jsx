@@ -33,6 +33,21 @@ function Site() {
           <T k="supportEmail" label="Support email" hint="Shown in the footer of the home page." max={120} />
           <T k="supportPhone" label="Support phone or WhatsApp" max={30} />
         </section>
+        <section className="card"><h3>Logo and colour</h3>
+          <div className="sx-brand">
+            <span className="sx-logo" style={{ background: site.accent || undefined }}>{site.logoUrl ? <img src={site.logoUrl} alt="Current logo" /> : <span aria-hidden="true">✓</span>}</span>
+            <div>
+              <label className="btn btn-ghost btn-sm" style={{ cursor: 'pointer' }}>{site.logoUrl ? 'Change logo' : 'Upload logo'}<input type="file" accept="image/png,image/jpeg,image/webp,image/gif" hidden onChange={async (e) => { const fl = e.target.files[0]; if (!fl) return; try { const r = await api.upload(fl); up('logoUrl', r.url); } catch (x) { setBad(x.message); } e.target.value = ''; }} /></label>
+              {site.logoUrl && <button type="button" className="btn btn-ghost btn-sm" onClick={() => up('logoUrl', '')}>Use the default tick</button>}
+              <small className="muted" style={{ display: 'block', marginTop: 6 }}>A square PNG on a transparent background works best. It also becomes the browser tab icon.</small>
+            </div>
+          </div>
+          <label className="ad-field" style={{ display: 'block', marginBottom: 12 }}>Brand colour
+            <span className="sx-colour"><input type="color" aria-label="Pick a colour" value={site.accent || '#1e3a8a'} onChange={(e) => up('accent', e.target.value)} /><input value={site.accent || ''} placeholder="#1e3a8a" maxLength={7} onChange={(e) => up('accent', e.target.value)} />{site.accent && <button type="button" className="btn btn-ghost btn-sm" onClick={() => up('accent', '')}>Reset</button>}</span>
+            <small className="muted">Used for buttons, links and highlights everywhere. Pick a dark colour so white text stays readable. Leave empty for the default blue.</small>
+          </label>
+          <T k="footerText" label="Footer line on student pages" hint="Leave empty to show the tagline." max={200} />
+        </section>
         <section className="card"><h3>Home page text</h3>
           <T k="heroTitle" label="Headline" hint="Leave empty to use the built-in headline." max={160} area />
           <T k="heroText" label="Short description under the headline" max={300} area />

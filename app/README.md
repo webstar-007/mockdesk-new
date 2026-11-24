@@ -8,6 +8,7 @@ It is one Node.js program with a built-in SQLite database. No separate database 
 
 - **Students:** timed mocks with sectional timers and +3 / −1 marking, live-window mocks, practice sets, mistake notebook, bookmarks, PDF reports, share card, reminders, weekly summary, and a read-only progress link for a parent or mentor.
 - **Admins** (`/admin`): users, attempts, mocks, question editor and bank, bulk import from Word or CSV, duplicate finder, AI solution drafts, announcements, messages (in-app, push, email, WhatsApp), copy check, bulk student import, CSV exports, backups, staff permissions, and Settings for the site name, contact, home page text, limits and time zone.
+- **Team activity and branding (v20):** see who is signed in and what staff changed, lock accounts, and set your logo and colour.
 - **Alerts and assignments (v19):** alert bell with email/WhatsApp delivery, question quality loop, weekly auto-built mocks, teacher assignments with due dates and reminders. See docs/ADMIN.md.
 - **Admin tools (v18):** restart, database tools, restore, log viewer and version info (Server tools); release calendar; support inbox; view as student; per-person data download and erase; more bulk actions. See docs/ADMIN.md.
 - **Navigation:** every student, teacher and admin page (except the live exam) has Back and Forward buttons and a breadcrumb trail. Back goes to the previous page, or to the parent page when the visit started there. Alt + Left and Alt + Right work too.

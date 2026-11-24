@@ -10,6 +10,9 @@ export const SITE_DEFAULTS = {
   disclaimer: '',       // small print in the footer of the public page
   publicUrl: '',        // https://mock.example.com, used in emails and invite links
   faq: [],              // [{ q, a }]; empty = built-in questions
+  logoUrl: '',          // an uploaded image, /uploads/xxxx.png; empty = the built-in tick mark
+  accent: '',           // #rrggbb brand colour; empty = the built-in blue
+  footerText: '',       // line shown in the footer of the student pages
 };
 const str = (v, n) => String(v ?? '').trim().slice(0, n);
 
@@ -17,13 +20,17 @@ export function siteOf(settings, env = process.env) {
   const s = { ...SITE_DEFAULTS, ...(settings.get('site', {}) || {}) };
   return { ...s, name: s.name || SITE_DEFAULTS.name, publicUrl: (s.publicUrl || env.MOCKDESK_PUBLIC_URL || '').replace(/\/$/, ''), faq: Array.isArray(s.faq) ? s.faq : [] };
 }
+const lum = (hex) => { const c = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255).map((v) => (v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4)); return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]; };
 export function cleanSite(b = {}) {
+  const logo = str(b.logoUrl, 200); if (logo && !/^\/uploads\/[\w.-]+\.(png|jpe?g|webp|gif)$/i.test(logo)) throw new Error('The logo must be an image uploaded here');
+  let accent = str(b.accent, 7).toLowerCase(); if (accent && !/^#[0-9a-f]{6}$/.test(accent)) throw new Error('The brand colour must look like #1e3a8a');
+  if (accent && lum(accent) > 0.4) throw new Error('That colour is too light for white text on buttons. Pick a darker one.');
   const faq = (Array.isArray(b.faq) ? b.faq : []).map((x) => ({ q: str(x?.q, 200), a: str(x?.a, 1000) })).filter((x) => x.q && x.a).slice(0, 20);
   const url = str(b.publicUrl, 200).replace(/\/$/, '');
   if (url && !/^https?:\/\/[^\s/]+/i.test(url)) throw new Error('The site address must start with http:// or https://');
   const email = str(b.supportEmail, 120);
   if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new Error('The support email looks wrong');
-  return { name: str(b.name, 40) || SITE_DEFAULTS.name, tagline: str(b.tagline, 120), heroTitle: str(b.heroTitle, 160), heroText: str(b.heroText, 300), supportEmail: email, supportPhone: str(b.supportPhone, 30), disclaimer: str(b.disclaimer, 300), publicUrl: url, faq };
+  return { name: str(b.name, 40) || SITE_DEFAULTS.name, tagline: str(b.tagline, 120), heroTitle: str(b.heroTitle, 160), heroText: str(b.heroText, 300), supportEmail: email, supportPhone: str(b.supportPhone, 30), disclaimer: str(b.disclaimer, 300), publicUrl: url, faq, logoUrl: logo, accent, footerText: str(b.footerText, 200) };
 }
 
 export function limitsOf(settings, env = process.env) {

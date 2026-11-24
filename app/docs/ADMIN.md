@@ -173,3 +173,9 @@ All of these are in the admin console. Open **Server** for the tools, **Tests > 
 **Mock builder and auto-build.** In *Tests > Build from bank* pick sections, topics and difficulty, preview, and save as draft or schedule it. *Weekly auto-build* makes a mock on its own every N days (draft or scheduled) and alerts you when it is ready, or when the bank is short.
 
 **Assignments.** Teachers use *Assignments* in the teacher portal. Admins see everything under *Students > Assignments*.
+
+## v20: Team activity and branding
+
+**Team activity** (*Settings > Team activity*). Lists admins, staff and teachers with last activity, devices signed in and changes in the last 7 days. Click a name for their recent changes and sign-ins. *Sign out* ends their sessions; *Lock* also stops them signing in until you *Unlock*. *Lock all staff and teachers* is the emergency button; it never touches admins. You cannot lock yourself or the last active admin.
+
+**Branding** (*Settings > Site and limits > Logo and colour*). Logo (PNG, JPG, WebP or GIF, uploaded here), brand colour (a dark colour such as #0f766e) and a footer line. Clear a field to go back to the default. Changes show within a minute.

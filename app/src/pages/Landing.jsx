@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import BrandMark from '../components/BrandMark.jsx';
 import { Link } from 'react-router-dom';
 import '@fontsource-variable/bricolage-grotesque/wght.css';
 import { useSite } from '../lib/site.js';
@@ -91,7 +92,7 @@ export default function Landing() {
       <a className="skip" href="#lp-main">Skip to content</a>
       <header className="lp-head">
         <div className="lp-wrap lp-head-in">
-          <Link to="/" className="brand" aria-label={`${site.name} home`}><span className="brand-mark" aria-hidden="true">✓</span><span>{site.name}</span></Link>
+          <Link to="/" className="brand" aria-label={`${site.name} home`}><BrandMark /><span>{site.name}</span></Link>
           <nav aria-label="Page sections"><a href="#mocks">Mocks</a><a href="#pattern">Exam pattern</a><a href="#how">How it works</a><a href="#faq">FAQ</a></nav>
           <div className="lp-head-act"><ThemeToggle /><Link className="btn btn-ghost btn-sm" to="/login">Log in</Link><Link className="btn btn-primary btn-sm" to="/register">Sign up</Link></div>
         </div>

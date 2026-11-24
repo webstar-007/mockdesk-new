@@ -1,4 +1,5 @@
 import { lazy, Suspense, useEffect, useState } from 'react';
+import BrandMark from '../components/BrandMark.jsx';
 import PageNav from '../components/PageNav.jsx';
 import { Link, Navigate, NavLink, Route, Routes, useLocation } from 'react-router-dom';
 import { useAuth } from '../lib/auth.jsx';
@@ -47,6 +48,7 @@ const ServerTools = lazy(() => import('./ServerTools.jsx'));
 const Calendar = lazy(() => import('./Calendar.jsx'));
 const Support = lazy(() => import('./Support.jsx'));
 const Alerts = lazy(() => import('./Alerts.jsx'));
+const Team = lazy(() => import('./Team.jsx'));
 const Assignments = lazy(() => import('./Assignments.jsx'));
 import AlertBell from './AlertBell.jsx';
 
@@ -59,7 +61,7 @@ const HUBS = [
   { id: 'insights', label: 'Insights', icon: '📊', tabs: [['analytics', 'Analytics'], ['ask', 'Ask your data'], ['integrity', 'Integrity'], ['anomalies', 'Copy check']] },
   { id: 'comms', label: 'Messages', icon: '📣', tabs: [['support', 'Support inbox'], ['messages', 'Send a message'], ['announcements', 'Announcements'], ['notifications', 'Reminder rules']] },
   { id: 'server', label: 'Server', icon: '🖥', tabs: [['alerts', 'Alerts'], ['monitor', 'Monitoring'], ['tools', 'Server tools'], ['control', 'Control room'], ['security', 'Security'], ['integrations', 'Integrations'], ['system', 'System'], ['data', 'Data and backup']] },
-  { id: 'settings', label: 'Settings', icon: '⚙', tabs: [['settings', 'Settings']] },
+  { id: 'settings', label: 'Settings', icon: '⚙', tabs: [['settings', 'Settings'], ['team', 'Team activity']] },
 ];
 
 function AdminNav({ hubs }) {
@@ -94,7 +96,7 @@ export default function AdminApp() {
   return (
     <div className="ad">
       <aside className="ad-side">
-        <Link to="/admin" className="ad-brand"><span className="brand-mark" aria-hidden="true">✓</span><span>{site.name}<small>{editor ? 'Staff' : 'Admin'}</small></span></Link>
+        <Link to="/admin" className="ad-brand"><BrandMark /><span>{site.name}<small>{editor ? 'Staff' : 'Admin'}</small></span></Link>
         <nav className="ad-nav" aria-label="Admin">
           {hubs.map((h) => <Link key={h.id} to={`/admin${h.tabs[0][0] ? '/' + h.tabs[0][0] : ''}`} className={hubOf(h) ? 'active' : ''} aria-current={hubOf(h) ? 'page' : undefined}><span className="ico" aria-hidden="true">{h.icon}</span>{h.label}{h.id === 'questions' && open > 0 && <span className="cnt">{open}</span>}</Link>)}
         </nav>
@@ -128,6 +130,7 @@ export default function AdminApp() {
             <Route path="calendar" element={<Calendar />} />
             <Route path="support" element={<Support />} />
             <Route path="alerts" element={<Alerts />} />
+            <Route path="team" element={<Team />} />
             <Route path="assignments" element={<Assignments />} />
             <Route path="monitor" element={<Monitoring />} />
             <Route path="security" element={<Security />} />

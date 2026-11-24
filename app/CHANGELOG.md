@@ -1,5 +1,9 @@
 # What's new in MockDesk
 
+## v20: Team activity and branding
+**Team activity (Settings > Team activity).** Everyone with admin, staff or teacher access in one table: active now, devices signed in, changes in the last 7 days and status. Click a name to see what they changed, the devices they are signed in on and their recent sign-ins. Sign a person out, lock or unlock their account in one click, or lock every staff and teacher account at once if you suspect a takeover (admins are never affected, and you cannot lock yourself or the last admin). Repeated failed sign-ins on a staff account raise an alert.
+**Branding (Settings > Site and limits).** Upload your logo, pick a brand colour and set the footer line. The logo shows in every header and as the browser tab icon, and the colour is used for buttons and links on the student, teacher and public pages. Too-light colours are refused so button text stays readable. The admin console keeps its own look.
+
 ## v19: Alerts, question quality, auto-built mocks and teacher assignments
 **Alerts (Server > Alerts, and the bell in the top bar).** The platform now watches itself: low disk space, a spike in server errors, a failed or missing backup, a failed or paused background job, and the server not responding. Each shows on the dashboard and under the bell, can be marked read or hidden for a day, and clears itself when the problem goes. Optionally the same alerts are sent to your email or WhatsApp, once per problem. Thresholds are editable.
 **Question quality loop.** Questions that nobody got right, or that most toppers got wrong, are flagged next to the old flags and raise one alert asking you to review or replace them.

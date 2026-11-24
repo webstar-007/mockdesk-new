@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import BrandMark from '../components/BrandMark.jsx';
 import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import ThemeToggle from '../components/ThemeToggle.jsx';
 import { useAuth } from '../lib/auth.jsx';
@@ -61,7 +62,7 @@ export default function AuthPage({ mode }) {
       <header className="auth-top"><ThemeToggle labelled /></header>
 
       <main className="auth-main">
-        <Link to="/" className="auth-brand"><span className="brand-mark" aria-hidden="true">✓</span><span>{site.name}</span></Link>
+        <Link to="/" className="auth-brand"><BrandMark /><span>{site.name}</span></Link>
         <div className="auth-card">
           <nav className="auth-switch-tabs" aria-label="Account">
             <Link to="/login" className={!reg ? 'on' : ''} aria-current={!reg ? 'page' : undefined}>Sign in</Link>

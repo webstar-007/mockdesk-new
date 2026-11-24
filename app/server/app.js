@@ -256,7 +256,7 @@ export function createApp(db, { allowIncomplete = process.env.MOCKDESK_ALLOW_INC
   let pubCache = { at: 0, body: null };
   mountSharePublic(api, { db, now });
   setTimezone(limitsOf(settings).timezone);
-  api.get('/public/site', (req, res) => { const s = siteOf(settings); res.setHeader('Cache-Control', 'public, max-age=60'); res.json({ name: s.name, tagline: s.tagline, heroTitle: s.heroTitle, heroText: s.heroText, supportEmail: s.supportEmail, supportPhone: s.supportPhone, disclaimer: s.disclaimer, faq: s.faq, minPassword: limitsOf(settings).minPassword, maintenance: controls().maintenance.mode, maintenanceMessage: controls().maintenance.message, signupsOpen: controls().signups.open, signupDomains: controls().signups.domains, features: controls().features }); });
+  api.get('/public/site', (req, res) => { const s = siteOf(settings); res.setHeader('Cache-Control', 'public, max-age=60'); res.json({ name: s.name, tagline: s.tagline, heroTitle: s.heroTitle, heroText: s.heroText, supportEmail: s.supportEmail, supportPhone: s.supportPhone, disclaimer: s.disclaimer, faq: s.faq, logoUrl: s.logoUrl, accent: s.accent, footerText: s.footerText, minPassword: limitsOf(settings).minPassword, maintenance: controls().maintenance.mode, maintenanceMessage: controls().maintenance.message, signupsOpen: controls().signups.open, signupDomains: controls().signups.domains, features: controls().features }); });
   api.get('/public/overview', (req, res) => {
     if (!pubCache.body || Date.now() - pubCache.at > 60000) {
       const mocks = [];

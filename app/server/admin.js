@@ -15,6 +15,7 @@ import { mountAdminExtras } from './adminExtras.js';
 import { mountOps } from './ops.js';
 import { mountControl } from './control.js';
 import { mountAlertCentre } from './alertcentre.js';
+import { mountTeam } from './team.js';
 import { mountTools } from './tools.js';
 import { eraseUser } from './lib/userdata.js';
 import { mountSupportAdmin } from './support.js';
@@ -764,6 +765,7 @@ export function adminRouter({ assign, exitFn, drafter = null, db, now, invalidat
 
   qx = mountAdminExtras({ r, db, now, audit, bad, results, settings, notifier, features, runReminders, page });
   mountAlertCentre({ r, db, now, audit, bad, settings, notifier, mailer, whatsapp, jobs, recentErrors, qx, assign, exams, BUILTIN_ID, runBuild, bust });
+  mountTeam({ r, db, now, audit, bad, jobs });
   mountControl({ r, db, now, audit, bad, settings, notifier, mailer, creds, live, drafter, otpSender, whatsapp, jobs, metrics, controlsCache: controls, recentErrors });
   mountOps({ r, db, now, audit, bad, results, settings, notifier, page });
   mountTools({ r, db, now, audit, bad, settings, exitFn });

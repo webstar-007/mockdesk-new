@@ -128,3 +128,6 @@ Student side: `GET /support`, `POST /support {subject, category, body}`, `GET /s
 ## v19 endpoints
 Admin: `GET /admin/alert-center[?all=1]`, `GET /admin/alert-center/summary`, `POST /admin/alert-center/check`, `POST /admin/alert-center/read {id|'all'}`, `POST /admin/alert-center/:id/snooze {hours}`, `PUT /admin/alert-center/prefs`, `POST /admin/alert-center/test`, `GET|PUT /admin/auto-build`, `POST /admin/auto-build/run`, `GET /admin/assignments`.
 Teacher: `GET|POST /teacher/assignments`, `GET /teacher/assignments/:id`, `POST /teacher/assignments/:id/remind`. Student: `GET /my/assignments`.
+
+## v20 endpoints
+Admin only: `GET /admin/team`, `GET /admin/team/:id`, `POST /admin/team/:id/lock {reason}`, `POST /admin/team/:id/unlock`, `POST /admin/team/:id/signout`, `POST /admin/team/lock-all`. `PUT /admin/site` accepts `logoUrl`, `accent`, `footerText`; `GET /public/site` returns them.
