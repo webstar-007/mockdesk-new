@@ -260,3 +260,12 @@
 .lt-rbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:12px 14px}.lt-rbar .muted{flex:1;min-width:200px}.lt-row-act{white-space:nowrap}
 @media(max-width:640px){.lt-actions{max-width:none}.lt-verdict{flex-direction:column}}
 .lt-row-act{white-space:normal!important;min-width:170px}.lt-row-act .btn{margin:0 4px 4px 0}
+/* load test v3 */
+.lt-top{display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap}
+.lt-acts{display:grid;gap:8px}.lt-act{display:grid;grid-template-columns:minmax(200px,1fr) 2fr;gap:12px;align-items:center;padding:10px 12px;border:1px solid var(--line);border-left:4px solid var(--brand);border-radius:12px;background:var(--surface)}.lt-act.off{border-left-color:var(--line);opacity:.78}.lt-act-h{display:grid;gap:2px}.lt-act-h small{color:var(--muted);line-height:1.35}.lt-act-f{display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end}.lt-act-f .ad-field{margin:0;min-width:130px;flex:1}
+.lt-pg{display:inline-flex;gap:6px;align-items:center;cursor:pointer}.lt-pg input{width:auto!important}
+.lt-custom{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:6px}.lt-custom>input{flex:1;min-width:200px}.lt-custom label{display:flex;gap:6px;align-items:center;font-size:.85rem;color:var(--muted)}.lt-custom label input{width:70px}
+.lt-sticky{position:sticky;bottom:0;z-index:5;display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin:16px -14px -14px;padding:10px 14px;background:var(--surface);border-top:1px solid var(--line);border-radius:0 0 14px 14px;box-shadow:0 -6px 14px rgba(0,0,0,.06)}.lt-sticky .lt-sum{flex:1;min-width:220px;margin:0}
+@media(max-width:700px){.lt-act{grid-template-columns:1fr}}
+.lt-pg{display:inline-flex!important;flex-direction:row!important;align-items:center!important;gap:6px;padding:6px 12px!important;height:auto!important;white-space:nowrap;border-radius:999px}.lt-pg input{width:16px!important;height:16px!important;min-height:0!important;padding:0!important;margin:0!important;flex:none}
+.lt-act-f .ad-field{flex:0 1 190px}

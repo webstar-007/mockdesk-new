@@ -9,6 +9,9 @@ export const TONE = { good: 'good', ok: 'good', warn: 'warn', bad: 'bad', info: 
 export const SHAPES = [['steady', 'Steady', 'Students join over a short spread and keep working. Like a normal exam start.'], ['spike', 'All at once', 'Everyone joins in the first second. Like a live mock where the link goes out at 10:00.'], ['ramp', 'Gradual climb', 'Students join one by one all through the test. Finds the point where the server starts to struggle.']];
 const SHAPE_NAME = Object.fromEntries(SHAPES.map(([k, n]) => [k, n]));
 export const shapeName = (k) => SHAPE_NAME[k || 'steady'];
+const KIND_NAMES = { open: 'Open the test', save: 'Autosave answers', poll: 'Check progress', submit: 'Submit the test', result: 'Open the result', review: 'Review page (trick corner)', pdf: 'Download PDF report' };
+export const kindLabel = (k) => KIND_NAMES[k] || (k.startsWith('page:') ? `Page ${k.slice(5)}` : k.startsWith('custom:') ? `Custom ${k.slice(7)}` : k);
+export const kindOrder = (ks) => [...Object.keys(KIND_NAMES).filter((k) => ks.includes(k)), ...ks.filter((k) => !KIND_NAMES[k]).sort()];
 export const title = (x) => x.label || `${x.users} students, ${dt(x.at)}`;
 
 /** Line chart. `lines` = [{data, key, color, name, dash}]. Optional vertical `marks` = [{t,label}]. */
@@ -88,7 +91,7 @@ const csv = (rep) => { const keys = Object.keys(rep.samples[0] || {}); return [k
 const save = (name, text, type) => { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], { type })); a.download = name; a.click(); URL.revokeObjectURL(a.href); };
 
 export function Report({ rep, onAgain, onRerun, onCompare, onChanged, prevId }) {
-  const v = rep.verdict; const k = rep.kinds; const rows = [['open', 'Open the test'], ['save', 'Autosave answers'], ['poll', 'Check progress'], ['submit', 'Submit the test'], ['result', 'Open the result']].filter(([x]) => k[x]);
+  const v = rep.verdict; const k = rep.kinds; const rows = kindOrder(Object.keys(k)).map((x) => [x, kindLabel(x)]);
   const stamp = new Date(rep.at).toISOString().slice(0, 16).replace(':', '-'); const [edit, setEdit] = useState(false); const [label, setLabel] = useState(rep.label || ''); const [note, setNote] = useState(rep.note || '');
   const patch = async (b) => { try { await api.put(`/admin/loadtest/report/${rep.id}`, b); onChanged?.(); } catch (e) { toast(e.message, 'bad'); } };
   const bn = rep.bottleneck; const sc = rep.scorecard || [];

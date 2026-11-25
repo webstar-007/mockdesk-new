@@ -11,9 +11,18 @@ import { owned } from './lib/userdata.js';
 
 const SIM = '%@loadtest.invalid';
 const HIDDEN = '__loadtest__';
-export const LIMITS = { users: [1, 500], durationSec: [5, 120], saveEverySec: [3, 60], progress: [0, 90], rampSec: [0, 120], jitter: [0, 80], saveSize: [1, 10], resultPct: [0, 100], pollPct: [0, 100], markPct: [0, 50], submitSpreadPct: [5, 100], errStopPct: [10, 90] };
+export const LIMITS = { users: [1, 500], durationSec: [5, 120], saveEverySec: [3, 60], progress: [0, 90], rampSec: [0, 120], jitter: [0, 80], saveSize: [1, 10], resultPct: [0, 100], pollPct: [0, 100], markPct: [0, 50], submitSpreadPct: [5, 100], errStopPct: [10, 90], browsers: [0, 500], browsePerMin: [0, 30], browserPerMin: [1, 30], reviewPct: [0, 100], pdfPct: [0, 100] };
+/** Pages a signed-in student opens on their own: [key, label, path]. All are read-only. */
+export const PAGES = [['me', 'Profile', '/me'], ['mocks', 'Mock list', '/mocks'], ['announcements', 'Announcements', '/announcements'], ['inbox', 'Inbox', '/inbox'], ['assignments', 'Assignments', '/my/assignments'], ['practice', 'Practice overview', '/practice/overview'], ['stats', 'My stats', '/stats'], ['notebook', 'Notebook', '/notebook'], ['bookmarks', 'Bookmarks', '/bookmarks/ids'], ['errors', 'Error log summary', '/errors/summary'], ['batches', 'My batches', '/my/batches'], ['support', 'Support tickets', '/support'], ['referral', 'Referral', '/referral'], ['config', 'Site settings', '/config']];
+const PAGE_KEYS = PAGES.map((x) => x[0]); const DEFAULT_PAGES = ['me', 'mocks', 'announcements', 'inbox', 'assignments', 'practice', 'stats'];
+const PATH_OK = /^\/[A-Za-z0-9_\-/.:?=&%,{}]{0,160}$/;
+/** Extra read-only pages the admin wants to hit: GET only, never admin or sign-in routes. */
+export function cleanCustom(list) {
+  const out = []; for (const x of Array.isArray(list) ? list : []) { const path = String(x?.path || '').trim(); if (!path) continue; if (!PATH_OK.test(path) || path.includes('..') || /^\/(admin|auth|teacher)(\/|$|\?)/i.test(path) || /logout|delete|reset|restore/i.test(path)) continue; if (out.some((o) => o.path === path)) continue; out.push({ path, perMin: clamp(x.perMin, [1, 60], 6) }); if (out.length >= 6) break; }
+  return out;
+}
 export const PATTERNS = ['steady', 'spike', 'ramp'];
-export const DEFAULTS = { users: 100, durationSec: 60, saveEverySec: 10, progress: 40, submitAtEnd: true, pattern: 'steady', rampSec: null, jitter: 20, saveSize: 3, resultPct: 70, pollPct: 20, markPct: 10, submitSpreadPct: 18, errStopPct: 40, label: '', mockId: '' };
+export const DEFAULTS = { users: 100, durationSec: 60, saveEverySec: 10, progress: 40, submitAtEnd: true, pattern: 'steady', rampSec: null, jitter: 20, saveSize: 3, resultPct: 70, pollPct: 20, markPct: 10, submitSpreadPct: 18, errStopPct: 40, label: '', mockId: '', browsers: 0, browsePerMin: 0, browserPerMin: 6, reviewPct: 0, pdfPct: 0, pages: DEFAULT_PAGES, custom: [] };
 /** Turn whatever the browser sent into a safe, complete test configuration. */
 export function parseCfg(b = {}) {
   const pattern = PATTERNS.includes(b.pattern) ? b.pattern : 'steady'; const durationSec = clamp(b.durationSec, LIMITS.durationSec, 60);
@@ -21,7 +30,8 @@ export function parseCfg(b = {}) {
   const hasRamp = b.rampSec !== null && b.rampSec !== undefined && b.rampSec !== '';
   return { users: clamp(b.users, LIMITS.users, 100), durationSec, saveEverySec: clamp(b.saveEverySec, LIMITS.saveEverySec, 10), progress: clamp(b.progress, LIMITS.progress, 40), submitAtEnd: b.submitAtEnd !== false, mockId: String(b.mockId || ''),
     pattern, rampSec: hasRamp ? Math.min(durationSec, clamp(b.rampSec, LIMITS.rampSec, auto)) : auto, jitter: clamp(b.jitter, LIMITS.jitter, 20), saveSize: clamp(b.saveSize, LIMITS.saveSize, 3), resultPct: clamp(b.resultPct, LIMITS.resultPct, 70), pollPct: clamp(b.pollPct, LIMITS.pollPct, 20),
-    markPct: clamp(b.markPct, LIMITS.markPct, 10), submitSpreadPct: clamp(b.submitSpreadPct, LIMITS.submitSpreadPct, 18), errStopPct: clamp(b.errStopPct, LIMITS.errStopPct, 40), label: String(b.label || '').trim().slice(0, 60) };
+    markPct: clamp(b.markPct, LIMITS.markPct, 10), submitSpreadPct: clamp(b.submitSpreadPct, LIMITS.submitSpreadPct, 18), errStopPct: clamp(b.errStopPct, LIMITS.errStopPct, 40), browsers: clamp(b.browsers, LIMITS.browsers, 0), browsePerMin: clamp(b.browsePerMin, LIMITS.browsePerMin, 0), browserPerMin: clamp(b.browserPerMin, LIMITS.browserPerMin, 6), reviewPct: clamp(b.reviewPct, LIMITS.reviewPct, 0), pdfPct: clamp(b.pdfPct, LIMITS.pdfPct, 0),
+    pages: Array.isArray(b.pages) ? PAGE_KEYS.filter((k) => b.pages.includes(k)) : DEFAULT_PAGES, custom: cleanCustom(b.custom), label: String(b.label || '').trim().slice(0, 60) };
 }
 const clamp = (v, [lo, hi], d) => { const n = Number(v); return Number.isFinite(n) ? Math.min(hi, Math.max(lo, Math.round(n))) : d; };
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -40,7 +50,7 @@ function diskOf(file) {
 const sizeOf = (f) => { try { return fs.statSync(f).size; } catch { return 0; } };
 
 export function verdictOf(rep) {
-  const save = rep.kinds.save || rep.kinds.open || { p95: 0 }; const errPct = rep.totals.errorPct; const p95 = save.p95;
+  const save = rep.kinds.save || rep.kinds.open || { p95: 0 }; const errPct = rep.totals.coreErrorPct ?? rep.totals.errorPct; const p95 = save.p95;
   let level = 'good', title = 'Comfortable', text = `Autosaves answered in ${Math.round(p95)} ms at the 95th percentile with ${errPct}% errors. The server handled ${rep.config.users} students at once with room to spare.`;
   if (errPct > 5 || p95 > 2000 || rep.stopped === 'safety') { level = 'bad'; title = 'Overloaded'; text = `At ${rep.config.users} students the server slowed down badly (autosave p95 ${Math.round(p95)} ms, ${errPct}% errors). Students would notice lag or lose saves.`; }
   else if (errPct > 1 || p95 > 800) { level = 'warn'; title = 'Tight'; text = `It coped, but autosave p95 reached ${Math.round(p95)} ms (${errPct}% errors). Expect lag on a busier day.`; }
@@ -71,8 +81,12 @@ export function scorecardOf(rep) {
   const save = rep.kinds.save || rep.kinds.open || { p95: 0 }; const pk = rep.peaks; const out = []; const sub = rep.kinds.submit;
   const add = (key, label, value, status, meaning) => out.push({ key, label, value, status, meaning });
   add('speed', 'Autosave speed', msT(save.p95), lvl(save.p95, [300, 800, 2000]), 'How long a student waits after the page saves their answers (95 out of 100 saves were faster). Under 300 ms is invisible; over 2 seconds feels broken.');
-  add('errors', 'Failed requests', `${rep.totals.errorPct}%`, rep.totals.errorPct === 0 ? 'good' : rep.totals.errorPct < 1 ? 'ok' : rep.totals.errorPct < 5 ? 'warn' : 'bad', 'Requests that got an error or no answer. Every failed save is an answer a student might lose.');
+  const ce = rep.totals.coreErrorPct ?? rep.totals.errorPct;
+  add('errors', 'Failed requests', `${ce}%`, ce === 0 ? 'good' : ce < 1 ? 'ok' : ce < 5 ? 'warn' : 'bad', 'Requests that got an error or no answer. Every failed save is an answer a student might lose.');
+  if (rep.totals.customErrors) add('custom', 'Pages you added', `${rep.totals.customErrors} failed`, 'warn', 'Some of the extra pages you chose returned errors. That usually means the path is wrong, or the page needs a state the virtual students do not have (for example a submitted test). It does not mean the server is overloaded.');
   if (sub) add('submit', 'Submitting', msT(sub.p95), lvl(sub.p95, [500, 1500, 4000]), 'Time to submit a test while others submit too. This is the moment students are most anxious.');
+  if (rep.pages) add('pages', 'Browsing pages', msT(rep.pages.p95), lvl(rep.pages.p95, [400, 1200, 3000]), 'How long dashboard, inbox, mock list and similar pages took while the test ran (95 out of 100 were faster).');
+  if (rep.kinds.pdf) add('pdf', 'PDF report download', msT(rep.kinds.pdf.p95), lvl(rep.kinds.pdf.p95, [1500, 4000, 10000]), 'Building a result PDF is one of the heaviest things a student can do. Slow here means many students downloading at once will queue.');
   add('cpu', 'App processor', `${pk.cpuProc}% of one core`, lvl(pk.cpuProc, [60, 80, 95]), 'The app handles requests on one core. Near 100% means it cannot go any faster, however big the server is.');
   add('memory', 'Server memory', `${pk.memUsedPct}% used`, lvl(pk.memUsedPct, [70, 85, 95]), 'If memory runs out the server slows down badly or the app is killed.');
   add('disk', 'Disk space', pk.diskUsedPct ? `${pk.diskUsedPct}% used` : 'unknown', pk.diskUsedPct ? lvl(pk.diskUsedPct, [80, 90, 96]) : 'ok', 'A full disk stops saves and backups.');
@@ -102,7 +116,11 @@ export function plainOf(rep) {
   if (k.save) a.push(`A student's answers were saved in ${msT(k.save.p50)} usually, and in ${msT(k.save.p95)} or less 95 times out of 100. The slowest save took ${msT(k.save.max)}.`);
   if (k.submit) a.push(`Submitting took ${msT(k.submit.p50)} usually and up to ${msT(k.submit.p95)} for the slower ones, with ${u} students finishing within ${rep.config.submitSpreadPct}% of the test.`);
   if (k.result) a.push(`Opening the result took ${msT(k.result.p50)} usually and up to ${msT(k.result.p95)} for the slower ones.`);
+  for (const [kk, v] of Object.entries(k)) if (kk.startsWith('custom:') && v.errors) a.push(`Your page ${kk.slice(7)} failed ${v.errors} of ${v.n} times. Check the path is right and that it works for a signed-in student at that point in the test.`);
   a.push(`The server answered ${rep.totals.requests} requests; at its busiest it handled ${rep.totals.peakRps} in one second. ${rep.totals.errors ? `${rep.totals.errors} of them failed (${rep.totals.errorPct}%).` : 'None of them failed.'}`);
+  if (rep.pages) a.push(`Other pages (dashboard, inbox and so on) opened in ${msT(rep.pages.p50)} usually and ${msT(rep.pages.p95)} or less 95 times out of 100, across ${rep.pages.n} page views.`);
+  if (k.pdf) a.push(`Downloading the PDF report took ${msT(k.pdf.p50)} usually and up to ${msT(k.pdf.p95)} for the slower ones (${k.pdf.n} downloads).`);
+  if (rep.config.browsers) a.push(`${rep.config.browsers} extra students only browsed pages while the others sat the test.`);
   if (rep.moments?.firstSlowAt != null) a.push(`It first became slow (over 800 ms) ${rep.moments.firstSlowAt} seconds in, with about ${rep.moments.firstSlowUsers} students active. That is the point to stay below.`);
   else if (rep.totals.p95 > 0) a.push('It never became slow during the test: response times stayed under 800 ms.');
   if (rep.measuredLimit) a.push(rep.measuredLimit.users > 0 ? `Measured limit: response times stayed healthy up to ${rep.measuredLimit.users} students${rep.measuredLimit.atLeast ? ' (the highest tested, so the real limit is higher)' : ''}.` : 'It struggled even at the first step, so the limit is below the smallest group tested.');
@@ -127,7 +145,7 @@ export function limitOf(curve) {
 
 const M = [ // [key, label, getter, better, unit]
   ['users', 'Students', (r) => r.config.users, null, ''], ['save', 'Autosave, 95th percentile', (r) => r.kinds.save?.p95, 'low', 'ms'], ['open', 'Opening the test, 95th percentile', (r) => r.kinds.open?.p95, 'low', 'ms'],
-  ['submit', 'Submitting, 95th percentile', (r) => r.kinds.submit?.p95, 'low', 'ms'], ['result', 'Opening the result, 95th percentile', (r) => r.kinds.result?.p95, 'low', 'ms'], ['all99', 'All requests, 99th percentile', (r) => r.totals.p99, 'low', 'ms'],
+  ['submit', 'Submitting, 95th percentile', (r) => r.kinds.submit?.p95, 'low', 'ms'], ['result', 'Opening the result, 95th percentile', (r) => r.kinds.result?.p95, 'low', 'ms'], ['pages', 'Browsing pages, 95th percentile', (r) => r.pages?.p95, 'low', 'ms'], ['pdf', 'PDF download, 95th percentile', (r) => r.kinds.pdf?.p95, 'low', 'ms'], ['review', 'Review page, 95th percentile', (r) => r.kinds.review?.p95, 'low', 'ms'], ['all99', 'All requests, 99th percentile', (r) => r.totals.p99, 'low', 'ms'],
   ['slowest', 'Slowest request', (r) => r.totals.max, 'low', 'ms'], ['err', 'Failed requests', (r) => r.totals.errorPct, 'low', '%'], ['rps', 'Busiest second', (r) => r.totals.peakRps, 'high', '/s'],
   ['cpu', 'App processor (one core)', (r) => r.peaks.cpuProc, 'low', '%'], ['cpuSys', 'Whole-server processor', (r) => r.peaks.cpuSys, 'low', '%'], ['mem', 'Server memory used', (r) => r.peaks.memUsedPct, 'low', '%'], ['rss', 'App memory', (r) => r.peaks.rssMB, 'low', 'MB'],
   ['db', 'Slowest database write', (r) => r.peaks.writeMs, 'low', 'ms'], ['lag', 'Longest freeze', (r) => r.peaks.lagMs, 'low', 'ms'], ['grow', 'Database growth', (r) => r.dbGrowthMB, 'low', 'MB'], ['score', 'Health score', (r) => r.score, 'high', '/100'],
@@ -225,6 +243,10 @@ export function mountLoadTest({ r, db, now, audit, bad, settings, getMock, contr
         const aid = crypto.randomUUID(); insA.run(aid, uid, HIDDEN, segIdx, t - elapsed, t - elapsed, snapshot, JSON.stringify(resp));
         students.push({ uid, sid, aid, done: Object.keys(resp).length });
       }
+      for (let i = 0; i < cfg.browsers; i++) {
+        const uid = Number(insU.run(`Virtual browser ${i + 1}`, `lt-${runId}-b${i}@loadtest.invalid`, 'x', 'x', new Date(t).toISOString(), t).lastInsertRowid);
+        const sid = crypto.randomBytes(32).toString('hex'); insS.run(sid, uid, t + 3600000, '127.0.0.1', 'loadtest', t); students.push({ uid, sid, aid: null, browser: true });
+      }
       db.exec('COMMIT');
     } catch (e) { db.exec('ROLLBACK'); throw e; }
     const dbBefore = sizeOf(file()) + sizeOf(`${file()}-wal`);
@@ -244,6 +266,7 @@ export function mountLoadTest({ r, db, now, audit, bad, settings, getMock, contr
       win.n = 0; win.err = 0; win.lat = []; samples.push(s);
       if (run.phase === 'running') { peaks.cpuProc = Math.max(peaks.cpuProc, s.cpuProc); peaks.cpuSys = Math.max(peaks.cpuSys, s.cpuSys); peaks.rss = Math.max(peaks.rss, s.rss); peaks.heap = Math.max(peaks.heap, s.heap); peaks.memUsedPct = Math.max(peaks.memUsedPct, s.memUsedPct); peaks.diskUsedPct = Math.max(peaks.diskUsedPct, s.diskUsedPct || 0); peaks.writeMs = Math.max(peaks.writeMs, s.writeMs); peaks.lagMs = Math.max(peaks.lagMs, s.lagMs); peaks.rps = Math.max(peaks.rps, s.rps); } // set-up of the accounts is not exam load
       run.samples = samples; run.elapsed = r1(tt);
+      if (samples.length % 2 === 0) run.kindsLive = Object.fromEntries(Object.entries(kinds).map(([k, v]) => { const so = v.lat.slice().sort((a, b) => a - b); return [k, { n: v.n, errors: v.err, p50: r1(pct(so, 50)), p95: r1(pct(so, 95)) }]; }));
       const once = (k, text, level) => { if (!flags[k]) { flags[k] = 1; run.events.push({ t: r1(tt), text, level }); } };
       if (run.phase === 'running') {
         if (s.p95 > 800 && win0 > 2) { once('slow', `Response time passed 800 ms with ${run.active} students active.`, 'warn'); if (run.firstSlow == null) run.firstSlow = { t: r1(tt), users: run.active }; }
@@ -267,9 +290,21 @@ export function mountLoadTest({ r, db, now, audit, bad, settings, getMock, contr
     if (ramp > 0) run.marks.push({ t: r1(tNow + cfg.rampSec), label: 'Everyone joined' }); if (cfg.submitAtEnd) run.marks.push({ t: r1(tNow + (submitFrom - performance.now()) / 1000), label: 'Submit wave' });
     run.events.push({ t: r1(tNow), text: cfg.pattern === 'spike' ? 'All students joined at once.' : cfg.pattern === 'ramp' ? `Students are joining gradually over ${cfg.rampSec} seconds.` : 'Students are joining.', level: 'info' });
     run.active = 0; let finished = 0;
+    const pagePaths = PAGES.filter((x) => cfg.pages.includes(x[0])).map((x) => x[2]);
+    /** Something a student does at a steady rate until the test ends, with a little randomness so they do not move in step. */
+    const rateLoop = async (perMin, act) => {
+      if (!perMin) return;
+      while (!stop) { const wait = (60000 / perMin) * (0.5 + Math.random()); if (performance.now() + wait > tEnd - 200) break; await sleep(wait); if (stop) break; await act(); }
+    };
+    const background = (s, perMin) => Promise.all([
+      pagePaths.length ? rateLoop(perMin, () => { const pth = pagePaths[Math.floor(Math.random() * pagePaths.length)]; return hit(`page:${pth}`, 'GET', pth, s.sid); }) : null,
+      ...cfg.custom.filter((c) => s.aid || !c.path.includes('{attempt}')).map((c) => rateLoop(c.perMin, () => hit(`custom:${c.path}`, 'GET', c.path.replace('{attempt}', s.aid || ''), s.sid))),
+    ]);
     const student = async (s, i) => {
       await sleep(cfg.pattern === 'ramp' ? (i / Math.max(1, students.length)) * ramp : Math.random() * ramp); if (stop) return; run.active++;
       try {
+        if (s.browser) { await background(s, cfg.browserPerMin); return; }
+        const bg = background(s, cfg.browsePerMin);
         await hit('open', 'GET', `/attempts/${s.aid}`, s.sid);
         let cum = 0;
         while (!stop && performance.now() < (cfg.submitAtEnd ? submitFrom : tEnd) - 200) {
@@ -286,7 +321,10 @@ export function mountLoadTest({ r, db, now, audit, bad, settings, getMock, contr
           await sleep(Math.max(0, submitFrom + Math.random() * (tEnd - submitFrom) * 0.9 - performance.now())); if (stop) return;
           await hit('submit', 'POST', `/attempts/${s.aid}/submit`, s.sid, { responses: {} });
           if (Math.random() * 100 < cfg.resultPct) await hit('result', 'GET', `/attempts/${s.aid}/result`, s.sid);
+          if (Math.random() * 100 < cfg.reviewPct) await hit('review', 'GET', `/attempts/${s.aid}/tips`, s.sid);
+          if (Math.random() * 100 < cfg.pdfPct) await hit('pdf', 'GET', `/attempts/${s.aid}/report.pdf`, s.sid);
         }
+        await bg;
       } finally { run.active--; finished++; }
     };
     const all = students.map((s, i) => student(s, i));
@@ -298,11 +336,12 @@ export function mountLoadTest({ r, db, now, audit, bad, settings, getMock, contr
     // 4. report
     const kOut = {}; let nAll = 0, eAll = 0; const lats = [];
     for (const [k, v] of Object.entries(kinds)) { const s = v.lat.slice().sort((a, b) => a - b); nAll += v.n; eAll += v.err; for (const x of v.lat) lats.push(x); kOut[k] = { n: v.n, errors: v.err, p50: r1(pct(s, 50)), p95: r1(pct(s, 95)), p99: r1(pct(s, 99)), max: r1(s[s.length - 1] || 0), avg: r1(s.reduce((a, b) => a + b, 0) / (s.length || 1)) }; }
+    const pageLat = Object.entries(kinds).filter(([k]) => k.startsWith('page:')).flatMap(([, v]) => v.lat).sort((a, b) => a - b); const pagesOut = pageLat.length ? { n: pageLat.length, p50: r1(pct(pageLat, 50)), p95: r1(pct(pageLat, 95)), max: r1(pageLat[pageLat.length - 1]) } : null;
     lats.sort((a, b) => a - b); const dbAfter = Math.max(...samples.map((x) => x.dbBytes), dbBefore);
     const rep = {
       id: run.id, at: run.startedAt, config: cfg, stopped: stop ? (run.userStop ? 'user' : 'safety') : '', stopReason: stop, durationSec: r1((performance.now() - T0) / 1000),
-      totals: { requests: nAll, errors: eAll, errorPct: nAll ? r1((eAll / nAll) * 100) : 0, p50: r1(pct(lats, 50)), p95: r1(pct(lats, 95)), p99: r1(pct(lats, 99)), max: r1(lats[lats.length - 1] || 0), peakRps: peaks.rps, avgRps: r1(nAll / Math.max(1, cfg.durationSec)), busy },
-      kinds: kOut, errors, peaks: { ...peaks, rssMB: Math.round(peaks.rss / MB), heapMB: Math.round(peaks.heap / MB) }, dbGrowthMB: r1((dbAfter - dbBefore) / MB), snapshotKB: run.snapshotKB,
+      totals: { customErrors: Object.entries(kinds).filter(([k]) => k.startsWith('custom:')).reduce((a, [, v]) => a + v.err, 0), coreErrorPct: (() => { let n = 0, e = 0; for (const [k, v] of Object.entries(kinds)) if (!k.startsWith('custom:')) { n += v.n; e += v.err; } return n ? r1((e / n) * 100) : 0; })(), requests: nAll, errors: eAll, errorPct: nAll ? r1((eAll / nAll) * 100) : 0, p50: r1(pct(lats, 50)), p95: r1(pct(lats, 95)), p99: r1(pct(lats, 99)), max: r1(lats[lats.length - 1] || 0), peakRps: peaks.rps, avgRps: r1(nAll / Math.max(1, cfg.durationSec)), busy },
+      kinds: kOut, pages: pagesOut, errors, peaks: { ...peaks, rssMB: Math.round(peaks.rss / MB), heapMB: Math.round(peaks.heap / MB) }, dbGrowthMB: r1((dbAfter - dbBefore) / MB), snapshotKB: run.snapshotKB,
       server: { cpus: cores, totalMem: memInfo().total, node: process.version, mock: src.row.name },
     };
     rep.label = cfg.label; rep.verdict = verdictOf(rep); rep.advice = adviceOf(rep); rep.events = run.events; rep.marks = run.marks;
@@ -325,8 +364,8 @@ export function mountLoadTest({ r, db, now, audit, bad, settings, getMock, contr
   const find = (id) => reports().find((x) => x.id === id);
 
   r.get('/loadtest', (req, res) => {
-    const run = cur && { id: cur.id, phase: cur.phase, note: cur.note, config: cur.cfg, elapsed: cur.elapsed || 0, active: cur.active || 0, samples: cur.samples || [], events: cur.events || [], marks: cur.marks || [], stopping: !!cur.stopping, error: cur.error || '', report: cur.report || null, startedAt: cur.startedAt };
-    res.json({ info: info(), run, history: history(), presets: presets(), defaults: DEFAULTS, patterns: PATTERNS });
+    const run = cur && { id: cur.id, phase: cur.phase, note: cur.note, config: cur.cfg, elapsed: cur.elapsed || 0, active: cur.active || 0, samples: cur.samples || [], events: cur.events || [], marks: cur.marks || [], kinds: cur.kindsLive || {}, stopping: !!cur.stopping, error: cur.error || '', report: cur.report || null, startedAt: cur.startedAt };
+    res.json({ info: info(), run, history: history(), presets: presets(), defaults: DEFAULTS, patterns: PATTERNS, pages: PAGES });
   });
   r.post('/loadtest/start', async (req, res) => {
     if (cur && !['done', 'failed'].includes(cur.phase)) return bad(res, 'A test is already running.', 409);

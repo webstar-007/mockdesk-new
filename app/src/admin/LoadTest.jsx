@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api } from '../lib/api.js';
 import { Badge, ConfirmModal, Err, Loading, Stat, toast } from './ui.jsx';
-import { Charts, Compare, Feed, Report, Results, SHAPES, TONE, bytes, ms, shapeName } from './LoadTestParts.jsx';
+import { Charts, Compare, Feed, Report, Results, SHAPES, TONE, bytes, kindLabel, ms, shapeName } from './LoadTestParts.jsx';
 
 const SCENARIOS = [
   ['Small class', 'Steady, 50 students', { users: 50, durationSec: 60, pattern: 'steady' }], ['Big batch', 'Steady, 100 students', { users: 100, durationSec: 60, pattern: 'steady' }],
@@ -15,74 +15,103 @@ function Live({ run, info, onStop, stopping }) {
   return (
     <section aria-live="polite">
       <div className="card lt-progress">
-        <div><b>{run.phase === 'setup' ? 'Setting up…' : run.phase === 'cleanup' ? 'Cleaning up…' : `Running: ${run.config.users} virtual students, ${shapeName(run.config.pattern).toLowerCase()}`}</b> {run.phase === 'running' && <Badge tone={TONE[level]}>{word}</Badge>}<span className="muted small"> {run.note}</span></div>
+        <div><b>{run.phase === 'setup' ? 'Setting up…' : run.phase === 'cleanup' ? 'Cleaning up…' : `Running: ${run.config.users}${run.config.browsers ? ` + ${run.config.browsers} browsing` : ''} virtual students, ${shapeName(run.config.pattern).toLowerCase()}`}</b> {run.phase === 'running' && <Badge tone={TONE[level]}>{word}</Badge>}<span className="muted small"> {run.note}</span></div>
         <div className="lt-bar" role="progressbar" aria-valuenow={pctDone} aria-valuemin="0" aria-valuemax="100"><i style={{ width: `${pctDone}%` }} /></div>
         <button className="btn btn-danger btn-sm" disabled={stopping || run.phase === 'cleanup'} onClick={onStop}>{stopping ? 'Stopping…' : 'Stop test'}</button>
       </div>
       <div className="ad-grid g4" style={{ margin: '12px 0' }}>
-        <Stat icon="👩‍🎓" label="Students active" value={`${run.active} of ${run.config.users}`} /><Stat icon="⚡" label="Requests per second" value={last.rps ?? 0} />
+        <Stat icon="👩‍🎓" label="Students active" value={`${run.active} of ${run.config.users + (run.config.browsers || 0)}`} /><Stat icon="⚡" label="Requests per second" value={last.rps ?? 0} />
         <Stat icon="⏱" label="Response time p95" value={ms(last.p95 || 0)} tone={last.p95 > 800 ? 'bad' : last.p95 > 300 ? 'warn' : ''} /><Stat icon="⚠" label="Failed in the last second" value={last.errors ?? 0} tone={last.errors ? 'bad' : ''} />
       </div>
       <div className="ad-grid g4" style={{ marginBottom: 12 }}>
         <Stat icon="🧠" label="App CPU (one core)" value={`${last.cpuProc ?? 0}%`} tone={last.cpuProc > 85 ? 'bad' : ''} /><Stat icon="💾" label="App memory" value={bytes(last.rss)} />
         <Stat icon="🖥" label="Server memory used" value={`${last.memUsedPct ?? 0}%`} tone={last.memUsedPct > 85 ? 'bad' : ''} /><Stat icon="📀" label="Disk used" value={last.diskUsedPct == null ? '–' : `${last.diskUsedPct}%`} />
       </div>
+      {Object.keys(run.kinds || {}).length > 0 && <section className="card" style={{ padding: 0, marginBottom: 12 }}><h3 style={{ padding: '12px 14px 0', margin: 0 }}>What students are doing</h3><div style={{ overflowX: 'auto' }}><table className="ad-table"><thead><tr><th>Action</th><th>Done</th><th>Typical</th><th>p95</th><th>Failed</th></tr></thead><tbody>{Object.entries(run.kinds).sort((a, b) => b[1].n - a[1].n).map(([k, v]) => <tr key={k}><td>{kindLabel(k)}</td><td>{v.n}</td><td>{ms(v.p50)}</td><td><b className={v.p95 > 800 ? 'sx-bad' : ''}>{ms(v.p95)}</b></td><td>{v.errors || '–'}</td></tr>)}</tbody></table></div></section>}
       <div className="ad-grid g2" style={{ alignItems: 'start' }}><Feed events={run.events} /><div /></div>
       <Charts s={s} cpus={info.cpus} marks={run.marks} />
     </section>
   );
 }
 
-function Num({ label, k, form, set, lim, hint, suffix, placeholder }) {
-  return (<label className="ad-field">{label}<input type="number" inputMode="numeric" min={lim?.[0]} max={lim?.[1]} placeholder={placeholder} value={form[k] ?? ''} onChange={(e) => set(k, e.target.value === '' ? null : Number(e.target.value))} />{(hint || suffix) && <small className="muted">{hint}</small>}</label>);
+function Num({ label, k, form, set, lim, hint, placeholder, disabled }) {
+  return (<label className="ad-field">{label}<input type="number" inputMode="numeric" disabled={disabled} min={lim?.[0]} max={lim?.[1]} placeholder={placeholder} value={form[k] ?? ''} onChange={(e) => set(k, e.target.value === '' ? null : Number(e.target.value))} />{hint && <small className="muted">{hint}</small>}</label>);
 }
 
-function Setup({ info, d, form, set, setForm, onStart, hasLast }) {
+function Act({ title: t, desc, on = true, children }) {
+  return (<div className={`lt-act ${on ? '' : 'off'}`}><div className="lt-act-h"><b>{t}</b><small>{desc}</small></div><div className="lt-act-f">{children}</div></div>);
+}
+
+function Setup({ info, d, form, set, setForm, onStart }) {
   const L = info.limits; const [adv, setAdv] = useState(false); const [pname, setPname] = useState(''); const [busy, setBusy] = useState(false);
-  const per = form.durationSec / Math.max(1, form.saveEverySec); const reqs = Math.round(form.users * (1 + per * (1 + form.pollPct / 100) + (form.submitAtEnd ? 1 + form.resultPct / 100 : 0)));
+  const dur = form.durationSec || 0; const sub = form.submitAtEnd; const pages = form.pages || []; const custom = form.custom || [];
+  const per = dur / Math.max(1, form.saveEverySec || 1);
+  const reqs = Math.round(form.users * (1 + per * (1 + form.pollPct / 100) + (sub ? 1 + (form.resultPct + form.reviewPct + form.pdfPct) / 100 : 0) + (pages.length ? (form.browsePerMin * dur) / 60 : 0)) + (pages.length ? (form.browsers * form.browserPerMin * dur) / 60 : 0) + custom.reduce((a, c) => a + ((form.users + form.browsers) * c.perMin * dur) / 60, 0));
+  const total = form.users + form.browsers;
   const savePreset = async () => { setBusy(true); try { await api.post('/admin/loadtest/presets', { name: pname, config: form }); setPname(''); toast('Preset saved'); d.reload(); } catch (e) { toast(e.message, 'bad'); } finally { setBusy(false); } };
   const apply = (c) => setForm((f) => ({ ...f, ...c }));
+  const togglePage = (k) => set('pages', pages.includes(k) ? pages.filter((x) => x !== k) : [...pages, k]);
+  const setCustom = (n, patch) => set('custom', custom.map((c, i) => (i === n ? { ...c, ...patch } : c)));
   return (
-    <div className="card">
-      <h3 style={{ marginTop: 0 }}>Test how many students the server can handle</h3>
-      <p className="muted">Creates temporary virtual students who sit a hidden copy of one of your mocks on this live server: they open it, autosave answers, submit and open the result. Real students are not affected, and everything created is deleted afterwards.</p>
+    <div className="card lt-setup">
+      <div className="lt-top"><h3 style={{ margin: 0 }}>Test how many students the server can handle</h3><button type="button" className="btn btn-ghost btn-sm" onClick={() => setForm({ ...d.defaults, mockId: form.mockId })}>Reset to defaults</button></div>
+      <p className="muted">Creates temporary virtual students on this live server. They sit a hidden copy of one of your mocks and do the things you choose below. Real students are not affected, and everything created is deleted afterwards.</p>
       <h4 className="lt-h">1. Pick a scenario</h4>
-      <div className="lt-presets" role="group" aria-label="Scenarios">{SCENARIOS.map(([n, sub, c]) => <button key={n} type="button" className={`chip ${form.users === c.users && form.pattern === c.pattern && form.durationSec === c.durationSec ? 'on' : ''}`} title={sub} onClick={() => apply(c)}><b>{n}</b> <span className="small">{sub}</span></button>)}</div>
-      {d.presets.length > 0 && <div className="lt-presets" role="group" aria-label="Your saved presets" style={{ marginTop: 8 }}>{d.presets.map((p) => <span key={p.id} className="chip lt-mine"><button type="button" onClick={() => apply(p.config)}><b>{p.name}</b> <span className="small">{p.config.users} students</span></button><button type="button" className="lt-x" aria-label={`Delete preset ${p.name}`} onClick={async () => { await api.del(`/admin/loadtest/presets/${p.id}`); d.reload(); }}>×</button></span>)}</div>}
+      <div className="lt-presets" role="group" aria-label="Scenarios">{SCENARIOS.map(([n, sub2, c]) => <button key={n} type="button" className={`chip ${form.users === c.users && form.pattern === c.pattern && form.durationSec === c.durationSec ? 'on' : ''}`} title={sub2} onClick={() => apply(c)}><b>{n}</b> <span className="small">{sub2}</span></button>)}</div>
+      {d.presets.length > 0 && <div className="lt-presets" role="group" aria-label="Your saved presets" style={{ marginTop: 8 }}>{d.presets.map((p) => <span key={p.id} className="chip lt-mine"><button type="button" onClick={() => apply({ ...d.defaults, ...p.config })}><b>{p.name}</b> <span className="small">{p.config.users} students</span></button><button type="button" className="lt-x" aria-label={`Delete preset ${p.name}`} onClick={async () => { await api.del(`/admin/loadtest/presets/${p.id}`); d.reload(); }}>×</button></span>)}</div>}
       <h4 className="lt-h">2. How do students arrive?</h4>
       <div className="lt-shape" role="radiogroup" aria-label="Traffic shape">{SHAPES.map(([k, n, t]) => <label key={k} className={form.pattern === k ? 'on' : ''}><input type="radio" name="shape" checked={form.pattern === k} onChange={() => set('pattern', k)} /><b>{n}</b><small>{t}</small></label>)}</div>
       <h4 className="lt-h">3. Size and length</h4>
       <div className="ad-grid g4">
-        <Num label="Students at the same time" k="users" form={form} set={set} lim={L.users} hint="1 to 500" /><Num label="Test length (seconds)" k="durationSec" form={form} set={set} lim={L.durationSec} hint="5 to 120" />
-        <Num label="Autosave every (seconds)" k="saveEverySec" form={form} set={set} lim={L.saveEverySec} hint="The exam page saves every 10 seconds." /><Num label="Already answered (%)" k="progress" form={form} set={set} lim={L.progress} hint="How far into the paper each student starts." />
-      </div>
-      <div className="ad-grid g2" style={{ marginTop: 6 }}>
+        <Num label="Students sitting the test" k="users" form={form} set={set} lim={L.users} hint="1 to 500" /><Num label="Test length (seconds)" k="durationSec" form={form} set={set} lim={L.durationSec} hint="5 to 120" />
+        <Num label="Already answered (%)" k="progress" form={form} set={set} lim={L.progress} hint="How far into the paper each student starts." />
         <label className="ad-field">Mock to copy<select value={form.mockId} onChange={(e) => set('mockId', e.target.value)}>{info.mocks.map((m) => <option key={m.id} value={m.id}>{m.name} ({m.questions} questions)</option>)}</select></label>
-        <label className="ad-field">Name this test (optional)<input maxLength={60} placeholder="For example: Before Sunday's mock" value={form.label} onChange={(e) => set('label', e.target.value)} /><small className="muted">Helps you find it later when comparing.</small></label>
       </div>
-      <button type="button" className="btn btn-ghost btn-sm" aria-expanded={adv} onClick={() => setAdv(!adv)} style={{ marginTop: 8 }}>{adv ? 'Hide' : 'Show'} more settings</button>
+      <label className="ad-field" style={{ maxWidth: 420 }}>Name this test (optional)<input maxLength={60} placeholder="For example: Before Sunday's mock" value={form.label} onChange={(e) => set('label', e.target.value)} /><small className="muted">Helps you find it later when comparing.</small></label>
+
+      <h4 className="lt-h">4. What do students do? <span className="muted small">Switch on only what you want to test.</span></h4>
+      <div className="lt-acts">
+        <Act title="Open the test" desc="Always on: every student opens their test first."><span className="muted small">Always</span></Act>
+        <Act title="Autosave answers" desc="The exam page saves answers on a timer. This is the main load during a test."><Num label="Every (seconds)" k="saveEverySec" form={form} set={set} lim={L.saveEverySec} /><Num label="Up to (answers per save)" k="saveSize" form={form} set={set} lim={L.saveSize} /></Act>
+        <Act title="Check progress" desc="The page re-reads the attempt now and then." on={form.pollPct > 0}><Num label="After saves (%)" k="pollPct" form={form} set={set} lim={L.pollPct} hint="0 = never" /></Act>
+        <Act title="Browse other pages while testing" desc="Students also open the pages ticked in step 5." on={form.browsePerMin > 0}><Num label="Page views per minute" k="browsePerMin" form={form} set={set} lim={L.browsePerMin} hint="0 = none" /></Act>
+        <Act title="Submit and finish" desc="Everyone submits near the end. This is the heaviest moment." on={sub}><label className="ad-chk"><input type="checkbox" checked={sub} onChange={(e) => set('submitAtEnd', e.target.checked)} /> Submit near the end</label><Num label="Submit within the last (%)" k="submitSpreadPct" form={form} set={set} lim={L.submitSpreadPct} disabled={!sub} hint="Smaller = sharper rush" /></Act>
+        <Act title="Open the result" desc="After submitting, students open their result and score analysis." on={sub && form.resultPct > 0}><Num label="Share of students (%)" k="resultPct" form={form} set={set} lim={L.resultPct} disabled={!sub} hint={sub ? '' : 'Needs Submit'} /></Act>
+        <Act title="Review page" desc="Students open the review page with the trick corner." on={sub && form.reviewPct > 0}><Num label="Share of students (%)" k="reviewPct" form={form} set={set} lim={L.reviewPct} disabled={!sub} hint={sub ? '0 = none' : 'Needs Submit'} /></Act>
+        <Act title="Download PDF report" desc="Building a PDF is heavy. Good to test before exam results go out." on={sub && form.pdfPct > 0}><Num label="Share of students (%)" k="pdfPct" form={form} set={set} lim={L.pdfPct} disabled={!sub} hint={sub ? '0 = none' : 'Needs Submit'} /></Act>
+        <Act title="Extra students who only browse" desc="People using the site while others sit the test: dashboard, inbox, mock list." on={form.browsers > 0}><Num label="How many" k="browsers" form={form} set={set} lim={L.browsers} hint="0 = none" /><Num label="Page views per minute each" k="browserPerMin" form={form} set={set} lim={L.browserPerMin} disabled={!form.browsers} /></Act>
+      </div>
+
+      <h4 className="lt-h">5. Which pages do browsing students open?</h4>
+      <div className="lt-presets" role="group" aria-label="Pages to browse">{(d.pages || []).map(([k, l]) => <label key={k} className={`chip lt-pg ${pages.includes(k) ? 'on' : ''}`}><input type="checkbox" checked={pages.includes(k)} onChange={() => togglePage(k)} />{l}</label>)}
+        <button type="button" className="btn btn-ghost btn-sm" onClick={() => set('pages', (d.pages || []).map((x) => x[0]))}>All</button><button type="button" className="btn btn-ghost btn-sm" onClick={() => set('pages', [])}>None</button></div>
+      <p className="small muted">These are read-only pages. Only used if "Browse other pages" or "Extra students who only browse" is above zero.</p>
+
+      <h4 className="lt-h">6. Any other page you want to test?</h4>
+      <p className="small muted" style={{ marginTop: 0 }}>Read-only pages only (GET). Every virtual student is signed in. Write <code>{'{attempt}'}</code> where the student's test id goes, for example <code>{'/attempts/{attempt}/errors'}</code>. Admin and sign-in pages are not allowed.</p>
+      {custom.map((c, n) => <div key={n} className="lt-custom"><input aria-label={`Page ${n + 1} path`} placeholder="/mocks" value={c.path} maxLength={160} onChange={(e) => setCustom(n, { path: e.target.value })} /><label>views per minute each <input type="number" min="1" max="60" value={c.perMin} onChange={(e) => setCustom(n, { perMin: Number(e.target.value) || 1 })} /></label><button type="button" className="btn btn-ghost btn-sm" onClick={() => set('custom', custom.filter((_, i) => i !== n))}>Remove</button></div>)}
+      {custom.length < 6 && <button type="button" className="btn btn-ghost btn-sm" onClick={() => set('custom', [...custom, { path: '', perMin: 6 }])}>Add a page</button>}
+
+      <button type="button" className="btn btn-ghost btn-sm" aria-expanded={adv} onClick={() => setAdv(!adv)} style={{ marginTop: 14 }}>{adv ? 'Hide' : 'Show'} advanced settings</button>
       {adv && (
         <div className="lt-adv">
           <div className="ad-grid g4">
-            <Num label="Joining spread (seconds)" k="rampSec" form={form} set={set} lim={L.rampSec} placeholder="Automatic" hint="How long students take to arrive. Empty = automatic for the shape." />
-            <Num label="Autosave timing variety (%)" k="jitter" form={form} set={set} lim={L.jitter} hint="0 = every student saves on the beat. Higher = more natural." />
-            <Num label="Most answers per save" k="saveSize" form={form} set={set} lim={L.saveSize} hint="Each save carries 1 up to this many answers." />
+            <Num label="Joining spread (seconds)" k="rampSec" form={form} set={set} lim={L.rampSec} placeholder="Automatic" hint="How long students take to arrive. Empty = automatic." />
+            <Num label="Autosave timing variety (%)" k="jitter" form={form} set={set} lim={L.jitter} hint="0 = every student saves on the beat." />
             <Num label="Marked for review (%)" k="markPct" form={form} set={set} lim={L.markPct} />
-            <Num label="Check progress (%)" k="pollPct" form={form} set={set} lim={L.pollPct} hint="Share of saves followed by a progress check." />
-            <Num label="Open their result (%)" k="resultPct" form={form} set={set} lim={L.resultPct} hint="Share of students who open the result after submitting." />
-            <Num label="Submit window (% of the test)" k="submitSpreadPct" form={form} set={set} lim={L.submitSpreadPct} hint="Everyone submits within the last part of the test. Smaller = a sharper rush." />
             <Num label="Stop if failures pass (%)" k="errStopPct" form={form} set={set} lim={L.errStopPct} hint="Safety stop for the test itself." />
           </div>
-          <label className="ad-chk" style={{ marginTop: 8 }}><input type="checkbox" checked={form.submitAtEnd} onChange={(e) => set('submitAtEnd', e.target.checked)} /> Everyone submits near the end and opens their result (the heaviest moment)</label>
           <label className="ad-field" style={{ marginTop: 8 }}>Note (saved with the result)<input maxLength={300} placeholder="For example: after moving to a bigger instance" value={form.note || ''} onChange={(e) => set('note', e.target.value)} /></label>
           <div className="lt-save"><input aria-label="Preset name" maxLength={40} placeholder="Save these settings as a preset" value={pname} onChange={(e) => setPname(e.target.value)} /><button className="btn btn-ghost btn-sm" disabled={!pname.trim() || busy} onClick={savePreset}>Save preset</button></div>
         </div>
       )}
-      <p className="lt-sum" role="status"><b>What will happen:</b> {form.users} virtual students, about {reqs.toLocaleString()} requests over roughly {form.durationSec + 15} seconds, about {Math.round(form.users / Math.max(1, form.saveEverySec))} autosaves per second once everyone has joined{form.pattern === 'ramp' ? '. Students join gradually, so the report shows where it started to struggle' : form.pattern === 'spike' ? '. Everyone joins at the start, a sharp rush' : ''}.</p>
       {!info.mocks.length && <p className="alert">There is no mock with at least 10 questions yet. Create one first.</p>}
       {info.activeStudents > 0 && <p className="alert" role="status">{info.activeStudents} real student{info.activeStudents > 1 ? 's were' : ' was'} active in the last 5 minutes. They may notice slowness during the test. A quiet time is better.</p>}
       {info.maintenance !== 'off' && <p className="alert" role="status">Maintenance mode is on. Turn it off first or the virtual students are blocked.</p>}
-      <p style={{ marginTop: 12 }}><button className="btn btn-primary" disabled={!info.mocks.length || info.maintenance !== 'off'} onClick={onStart}>Start the test</button> {hasLast && <span className="muted small"> The result is saved automatically.</span>}</p>
+      <div className="lt-sticky">
+        <p className="lt-sum" role="status"><b>{total} virtual students</b>{form.browsers ? ` (${form.users} sitting the test, ${form.browsers} browsing)` : ''}, about <b>{reqs.toLocaleString()} requests</b> over roughly {dur + 15} seconds{form.pattern === 'ramp' ? '. Students join gradually, so the report shows where it started to struggle' : form.pattern === 'spike' ? '. Everyone joins at the start' : ''}.</p>
+        <button className="btn btn-primary" disabled={!info.mocks.length || info.maintenance !== 'off' || !form.users} onClick={onStart}>Start the test</button>
+      </div>
     </div>
   );
 }
@@ -116,7 +145,7 @@ export default function LoadTest() {
       </div>
       {tab === 'new' && <>
         {run?.error && <div className="alert" role="alert">The last test could not run: {run.error}</div>}
-        <Setup info={info} d={d} form={form} set={set} setForm={setForm} onStart={() => setDlg(true)} hasLast />
+        <Setup info={info} d={d} form={form} set={set} setForm={setForm} onStart={() => setDlg(true)} />
         <div className="ad-grid g4" style={{ margin: '12px 0' }}>
           <Stat icon="🖥" label="Server" value={`${info.cpus} CPU`} sub={info.cpuModel.slice(0, 32)} /><Stat icon="🧠" label="Memory free" value={bytes(info.availMem)} sub={`of ${bytes(info.totalMem)}`} />
           <Stat icon="📀" label="Disk free" value={bytes(info.disk?.free)} sub={info.disk ? `${info.disk.usedPct}% used` : ''} /><Stat icon="🗄" label="Database size" value={bytes(info.dbBytes)} />

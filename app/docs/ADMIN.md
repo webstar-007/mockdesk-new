@@ -187,3 +187,5 @@ All of these are in the admin console. Open **Server** for the tools, **Tests > 
 **Load test (Server > Server tools > Load test).** Choose students, length, autosave interval, mock. Needs the platform out of maintenance mode. Start requires confirmation; Stop ends it early. Reports and history are kept; "Clear history" removes them. Test accounts end in `@loadtest.invalid` and are deleted automatically.
 
 **Load test round 2.** Saved results: Server > Server tools > Load test > Saved results. Tick two and press Compare the two. Pin keeps a test beyond the last 15; Clear unpinned removes the rest. Presets (More settings) store a setup for reuse. "Gradual climb" gives a measured limit.
+
+**Load test: what students do.** Step 4 lists every action with its own rate (0 = off). Extra browse-only students and the pages they open are set in steps 4 and 5; step 6 adds your own read-only pages. Custom pages are GET only; admin, teacher and sign-in paths are refused. Errors from custom pages are shown separately from exam errors.

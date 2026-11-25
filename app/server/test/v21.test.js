@@ -204,3 +204,19 @@ test('load test v2: custom settings are clamped, results are saved, compared, la
   await call('boss', 'DELETE', `/admin/loadtest/report/${a.id}`); assert.equal((await call('boss', 'GET', '/admin/loadtest')).body.history.length, 0); assert.equal((await call('boss', 'GET', `/admin/loadtest/report/${a.id}`)).status, 404);
   assert.equal(db.prepare("SELECT COUNT(*) c FROM users WHERE email LIKE '%@loadtest.invalid'").get().c, 0);
 });
+
+test('load test v3: students can browse pages, extra browsers, custom pages, review and pdf', async () => {
+  const { parseCfg, cleanCustom, PAGES } = await import('../loadtest.js');
+  assert.deepEqual(cleanCustom([{ path: '/mocks', perMin: 99 }, { path: '/admin/users' }, { path: 'nope' }, { path: '/a/../b' }, { path: '/auth/logout' }, { path: '/mocks' }, { path: '/attempts/{attempt}/tips', perMin: 0 }]).map((x) => `${x.path}:${x.perMin}`), ['/mocks:60', '/attempts/{attempt}/tips:1']);
+  const c = parseCfg({ browsers: 9999, browsePerMin: -4, pages: ['me', 'bogus'], custom: [{ path: '/me' }] }); assert.equal(c.browsers, 500); assert.equal(c.browsePerMin, 0); assert.deepEqual(c.pages, ['me']); assert.equal(c.custom.length, 1);
+  { const ctl = (await call('boss', 'GET', '/admin/controls')).body; const c = ctl.controls || ctl; await call('boss', 'PUT', '/admin/controls', { ...c, features: { ...c.features, tips: true } }); }
+  const i = (await call('boss', 'GET', '/admin/loadtest')).body; assert.equal(i.pages.length, PAGES.length);
+  const run = async (body) => { assert.equal((await call('boss', 'POST', '/admin/loadtest/start', { confirm: 'start', mockId: i.info.mocks[0].id, durationSec: 8, saveEverySec: 3, ...body })).status, 202); let g; for (let n = 0; n < 120; n++) { await new Promise((r) => setTimeout(r, 400)); g = (await call('boss', 'GET', '/admin/loadtest')).body; if (['done', 'failed'].includes(g.run?.phase)) break; } assert.equal(g.run.phase, 'done', g.run.error); return g.run.report; };
+  const rep = await run({ users: 4, browsers: 3, browsePerMin: 30, browserPerMin: 30, pages: PAGES.map((x) => x[0]), custom: [{ path: '/attempts/{attempt}/tips', perMin: 30 }, { path: '/no/such/page', perMin: 30 }], reviewPct: 100, pdfPct: 100, resultPct: 100 });
+  const keys = Object.keys(rep.kinds); assert.ok(keys.some((k) => k.startsWith('page:')), keys.join()); assert.ok(keys.some((k) => k.startsWith('custom:')));
+  assert.ok(rep.kinds.review?.n === 4 && rep.kinds.pdf?.n === 4, JSON.stringify(rep.errors)); assert.ok(rep.pages.n >= 6); assert.equal(rep.totals.coreErrorPct, 0, 'real exam and page actions never failed'); assert.ok(rep.totals.customErrors > 0 && rep.kinds['custom:/no/such/page'].errors > 0); assert.notEqual(rep.verdict.title, 'Overloaded'); assert.ok(rep.scorecard.some((r) => r.key === 'custom')); assert.ok(rep.plain.some((x) => /Your page \/no\/such\/page failed/.test(x)));
+  assert.ok(rep.scorecard.some((r) => r.key === 'pages')); assert.ok(rep.scorecard.some((r) => r.key === 'pdf')); assert.ok(rep.plain.some((p) => /extra students only browsed/.test(p)));
+  assert.equal(rep.config.browsers, 3);
+  assert.equal(db.prepare("SELECT COUNT(*) c FROM users WHERE email LIKE '%@loadtest.invalid'").get().c, 0, 'browser accounts removed too');
+  await call('boss', 'DELETE', '/admin/loadtest/history');
+});
