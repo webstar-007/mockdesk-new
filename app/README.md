@@ -9,6 +9,7 @@ It is one Node.js program with a built-in SQLite database. No separate database 
 - **Students:** timed mocks with sectional timers and +3 / −1 marking, live-window mocks, practice sets, mistake notebook, bookmarks, PDF reports, share card, reminders, weekly summary, and a read-only progress link for a parent or mentor.
 - **Admins** (`/admin`): users, attempts, mocks, question editor and bank, bulk import from Word or CSV, duplicate finder, AI solution drafts, announcements, messages (in-app, push, email, WhatsApp), copy check, bulk student import, CSV exports, backups, staff permissions, and Settings for the site name, contact, home page text, limits and time zone.
 - **Help, trick corner, stamina curve, load simulator (v21):** an in-dashboard help assistant, student shortcuts with upvotes and teacher verification, a stamina and panic-streak analysis on results, and a safe load test for the live server.
+- **Administrators (v22):** invite or remove admins and staff, presets, rules, idle-staff lock, activity. Earlier (v20): team activity and branding.
 - **Team activity and branding (v20):** see who is signed in and what staff changed, lock accounts, and set your logo and colour.
 - **Alerts and assignments (v19):** alert bell with email/WhatsApp delivery, question quality loop, weekly auto-built mocks, teacher assignments with due dates and reminders. See docs/ADMIN.md.
 - **Admin tools (v18):** restart, database tools, restore, log viewer and version info (Server tools); release calendar; support inbox; view as student; per-person data download and erase; more bulk actions. See docs/ADMIN.md.
@@ -39,7 +40,7 @@ Use the **mockdesk-oneclick** kit. Copy this project's files into its `app/` fol
 
 | What | Where |
 |---|---|
-| Site name, tagline, contact, home page text and questions, limits, time zone | Admin > Settings > Site and limits |
+| Site name, tagline, contact, home page text and questions, limits, time zone | Admin > Settings > Site configuration |
 | Exams, mocks, questions | Admin > Exams, Mocks, Question editor, Content tools |
 | Who is admin, staff or teacher | Admin > Users |
 | Messages, reminders, WhatsApp rules, quiet hours | Admin > Notifications and Messages |
@@ -49,7 +50,7 @@ Use the **mockdesk-oneclick** kit. Copy this project's files into its `app/` fol
 | What is connected (email, SMS, WhatsApp, AI), test email | Admin > Integrations |
 | Backups and CSV exports | Admin > Data and backup |
 | Keys and connections: email (SMTP), SMS, WhatsApp, AI model (Claude or OpenAI), with test buttons | Admin > Server > Integrations |
-| Sign-in length, code rules, shortest password | Admin > Settings > Site and limits |
+| Sign-in length, code rules, shortest password | Admin > Settings > Site configuration |
 
 Keys typed in the admin panel are stored encrypted in the database and are never shown again. The encryption key is a separate file, `data/.mockdesk-key`, next to the database (or set `MOCKDESK_SECRET_KEY`). Keep that file with your backups: a restored database cannot read its saved keys without it. Environment variables still work as a fallback; a value saved in the admin panel wins.
 

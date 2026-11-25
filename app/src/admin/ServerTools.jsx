@@ -2,17 +2,18 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../lib/api.js';
 import LoadTest from './LoadTest.jsx';
+import Health from './System.jsx';
 import { Badge, ConfirmModal, Empty, Err, Loading, PageHead, Stat, ago, dt, toast, useLoad } from './ui.jsx';
 
 const bytes = (b) => (b == null ? '–' : b > 1073741824 ? `${(b / 1073741824).toFixed(1)} GB` : b > 1048576 ? `${(b / 1048576).toFixed(1)} MB` : `${Math.max(0, Math.round(b / 1024))} KB`);
 const span = (s) => { const d = Math.floor(s / 86400), h = Math.floor((s % 86400) / 3600), m = Math.floor((s % 3600) / 60); return d ? `${d}d ${h}h` : h ? `${h}h ${m}m` : `${m}m`; };
-const TABS = [['overview', 'Overview'], ['database', 'Database'], ['logs', 'Logs'], ['load', 'Load test'], ['new', 'What’s new']];
+const TABS = [['overview', 'Health and restart'], ['database', 'Database'], ['logs', 'Logs'], ['load', 'Load test'], ['new', 'What’s new']];
 
 export default function ServerTools() {
   const [tab, setTab] = useState('overview');
   return (
     <>
-      <PageHead title="Server tools" sub="Restart the app, look after the database, read recent logs and see which version is running." />
+      <PageHead title="Server tools" sub="Check the server is healthy, restart the app, look after the database, read logs, and test how many students it can handle." />
       <nav className="ad-tabs" aria-label="Server tools">{TABS.map(([k, l]) => <button key={k} type="button" className={tab === k ? 'on' : ''} aria-pressed={tab === k} onClick={() => setTab(k)}>{l}</button>)}</nav>
       {tab === 'overview' && <Overview />}{tab === 'database' && <Database />}{tab === 'logs' && <Logs />}{tab === 'load' && <LoadTest />}{tab === 'new' && <WhatsNew />}
     </>
@@ -25,17 +26,11 @@ function Overview() {
   useEffect(() => { if (!down) return undefined; let n = 0; const t = setInterval(async () => { n++; try { await api.get('/config'); if (n > 2) window.location.reload(); } catch { /* still restarting */ } if (n > 60) setDown(false); }, 2000); return () => clearInterval(t); }, [down]);
   if (loading && !d) return <Loading />; if (err) return <Err>{err}</Err>;
   const restart = async () => { setBusy(true); try { await api.post('/admin/server/restart', { confirm: 'restart' }); setDlg(false); setDown(true); } catch (e) { toast(e.message, 'bad'); } finally { setBusy(false); } };
-  const memUsed = d.totalMem ? Math.round(((d.totalMem - d.freeMem) / d.totalMem) * 100) : 0;
   if (down) return <section className="card" role="status"><h3>Restarting…</h3><p className="muted">The app is starting again. This page reloads by itself as soon as it is back, usually within 10 seconds.</p></section>;
   return (
     <>
       {d.staged && <div className="alert" role="status"><b>A restored backup is waiting.</b> It is applied when the server restarts. <button className="btn btn-ghost btn-sm" disabled={cancelling} onClick={async () => { setCancelling(true); try { await api.del('/admin/server/restore'); toast('Restore cancelled'); reload(); } finally { setCancelling(false); } }}>Cancel restore</button></div>}
-      <div className="ad-grid g4">
-        <Stat icon="⏱" label="Running for" value={span(d.uptimeSec)} sub={`since ${dt(d.startedAt)}`} />
-        <Stat icon="🧠" label="Memory in use" value={`${memUsed}%`} sub={`app uses ${bytes(d.rss)}`} tone={memUsed > 90 ? 'bad' : memUsed > 75 ? 'warn' : 'good'} />
-        <Stat icon="⚙" label="Server load" value={d.load[0]} sub={`${d.cpus} CPU core${d.cpus === 1 ? '' : 's'}`} tone={d.load[0] > d.cpus * 1.5 ? 'bad' : ''} />
-        <Stat icon="🗄" label="Database" value={bytes(d.database.size + d.database.wal)} sub={d.database.file} />
-      </div>
+      <Health embedded />
       <section className="card" style={{ marginTop: 14 }}>
         <h3>Restart the app</h3>
         <p className="muted">A restart takes about 10 seconds. Students in a test keep their answers and timer, and the page reconnects. Use it after changing keys that need a fresh start, or if something looks stuck.</p>

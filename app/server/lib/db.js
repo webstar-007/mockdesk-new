@@ -82,7 +82,7 @@ export function openDb(file = process.env.MOCKDESK_DB || path.join(ROOT, 'data',
     CREATE TABLE IF NOT EXISTS share_links (id INTEGER PRIMARY KEY, user_id INTEGER, token_hash TEXT UNIQUE, label TEXT, created_at INTEGER, expires_at INTEGER, revoked_at INTEGER, views INTEGER DEFAULT 0, last_viewed_at INTEGER);
     CREATE INDEX IF NOT EXISTS idx_share_user ON share_links(user_id);
     CREATE TABLE IF NOT EXISTS solution_drafts (question_id TEXT PRIMARY KEY, data TEXT, ai_answer INTEGER, model TEXT, status TEXT, created_at INTEGER, created_by TEXT, decided_at INTEGER, decided_by TEXT);
-    CREATE TABLE IF NOT EXISTS anomaly_dismissed (key TEXT PRIMARY KEY, at INTEGER, by TEXT);
+    CREATE TABLE IF NOT EXISTS admin_invites (id INTEGER PRIMARY KEY, contact TEXT UNIQUE, kind TEXT, role TEXT, perms TEXT, by_name TEXT, at INTEGER);
     CREATE TABLE IF NOT EXISTS dup_ignored (a TEXT NOT NULL, b TEXT NOT NULL, PRIMARY KEY (a, b));
   `);
   db.exec('CREATE TABLE IF NOT EXISTS doubts(id INTEGER PRIMARY KEY, user_id INTEGER, attempt_id TEXT, question_id TEXT, intent TEXT, at INTEGER); CREATE INDEX IF NOT EXISTS idx_doubts_user ON doubts(user_id, at);');

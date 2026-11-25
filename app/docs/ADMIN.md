@@ -5,7 +5,7 @@ Open `/admin` while signed in as an admin (an "Admin" link appears in the top ba
 ## Becoming an admin
 - The first admin: `admin@gmail.com` is built in (see `DEFAULT_ADMINS` in `server/lib/admins.js`). Sign up with it, and keep it private until you do. To add others, put an email or mobile number in `admins.txt`, one per line, before you deploy (or set `MOCKDESK_ADMIN_EMAILS`). Whoever signs up with it becomes an admin.
 - After that, manage people in the console: Users > the user > Change role (admin, staff, teacher or student). Staff roles can be limited to the tools you tick.
-- Admins can also change the site name, contact details, limits and time zone in Settings > Site and limits. No file editing is needed.
+- Admins can also change the site name, contact details, limits and time zone in Settings > Site configuration. No file editing is needed.
 
 ## Admin accounts are separate from student accounts
 - An admin only sees the admin console. Student pages (home, profile, toolkit, tests) redirect to `/admin`, the student top bar is not shown, and the student API returns 403 for admins.
@@ -124,9 +124,9 @@ The menu has eight sections. Each has tabs at the top. All old page addresses st
 | Students | All students, Batches, Cohorts, Import, Referrals |
 | Tests | Mocks, Exams, Live now, Attempts |
 | Questions | Question bank, Import and AI, Quality, Coverage, Student reports (red number = open reports) |
-| Insights | Analytics, Ask your data, Integrity, Copy check |
+| Insights | Analytics, Ask your data, Integrity |
 | Messages | Send a message, Announcements, Reminder rules |
-| Server | Monitoring, Control room, Security, Integrations, System, Data and backup |
+| Server | Monitoring, Control room, Security, Integrations, Data and backup |
 | Settings | Site, limits and everything else |
 
 Staff only see the sections and tabs their access allows. The dashboard's "Needs your attention" merges server alerts, student reports, suspect questions and inactive students into one list.
@@ -135,7 +135,7 @@ Staff only see the sections and tabs their access allows. The dashboard's "Needs
 - **Server > Integrations:** type the details for Email (SMTP), SMS (Twilio or MSG91), WhatsApp (Meta or Twilio), AI model (Anthropic or OpenAI, plus model name) and browser notification contact. Save applies at once, no restart. Use **Send a test** or **Test the key** to check.
 - Secrets are encrypted, never shown again (only the last 4 characters), and **Remove** deletes one. Leave a secret box empty to keep the saved value. A value saved here overrides the server setting; delete it to fall back.
 - The encryption key is `data/.mockdesk-key`. Copy it with your backups (or set `MOCKDESK_SECRET_KEY`). Without it a restored database cannot decrypt saved keys; just type them again.
-- **Settings > Site and limits > Sign-in and security:** stay-signed-in days, short session hours, code validity, codes per hour, wrong tries, shortest password.
+- **Settings > Site configuration > Sign-in and security:** stay-signed-in days, short session hours, code validity, codes per hour, wrong tries, shortest password.
 
 ## v15: Student dashboard
 One page, no tabs. A large "next step" card (resume or start the next mock, with progress ring). Below it, the mock cards on the left, and a side column on the right: snapshot (readiness, best score, average, accuracy, target progress), focus topics, this week's streak and recent results. Weak-topic practice sits under the mocks. "Detailed analysis" (skills, study plan, trend, activity, full history), "Exam guide" and the toolkit are one click away. New students see a short "How it works" card instead of empty charts.
@@ -176,9 +176,9 @@ All of these are in the admin console. Open **Server** for the tools, **Tests > 
 
 ## v20: Team activity and branding
 
-**Team activity** (*Settings > Team activity*). Lists admins, staff and teachers with last activity, devices signed in and changes in the last 7 days. Click a name for their recent changes and sign-ins. *Sign out* ends their sessions; *Lock* also stops them signing in until you *Unlock*. *Lock all staff and teachers* is the emergency button; it never touches admins. You cannot lock yourself or the last active admin.
+**Team activity** (*Settings > Administrators*). Lists admins, staff and teachers with last activity, devices signed in and changes in the last 7 days. Click a name for their recent changes and sign-ins. *Sign out* ends their sessions; *Lock* also stops them signing in until you *Unlock*. *Lock all staff and teachers* is the emergency button; it never touches admins. You cannot lock yourself or the last active admin.
 
-**Branding** (*Settings > Site and limits > Logo and colour*). Logo (PNG, JPG, WebP or GIF, uploaded here), brand colour (a dark colour such as #0f766e) and a footer line. Clear a field to go back to the default. Changes show within a minute.
+**Branding** (*Settings > Site configuration > Logo and colour*). Logo (PNG, JPG, WebP or GIF, uploaded here), brand colour (a dark colour such as #0f766e) and a footer line. Clear a field to go back to the default. Changes show within a minute.
 
 
 ## v21: Help, Tricks and Load test
@@ -189,3 +189,13 @@ All of these are in the admin console. Open **Server** for the tools, **Tests > 
 **Load test round 2.** Saved results: Server > Server tools > Load test > Saved results. Tick two and press Compare the two. Pin keeps a test beyond the last 15; Clear unpinned removes the rest. Presets (More settings) store a setup for reuse. "Gradual climb" gives a measured limit.
 
 **Load test: what students do.** Step 4 lists every action with its own rate (0 = off). Extra browse-only students and the pages they open are set in steps 4 and 5; step 6 adds your own read-only pages. Custom pages are GET only; admin, teacher and sign-in paths are refused. Errors from custom pages are shown separately from exam errors.
+
+## v22: Administrators, Site configuration, Help
+- **Settings now has three tabs:** Site configuration (was Site and limits), Administrators (replaces Admins and editors and Team activity) and Audit log. Exam pattern was removed.
+- **Administrators:** filter by role, online or locked; search; Invite by email or phone (existing users are promoted at once, new people when they sign up); Manage role, preset (Content, Analyst, Support) or ticked areas; Remove access; Activity per person; Lock, Unlock, Sign out; Lock all. Rules: most admins allowed, notify other admins, default staff preset, idle days before staff are flagged, Lock idle staff. `admin@gmail.com` stays built in. At least one active admin always remains.
+- **Server > Server tools:** first tab Health and restart now includes the old System checks. The System page is gone.
+- **Insights:** Copy check was removed.
+- **Help:** quick checks (alerts, errors, backup, disk, waiting replies) with colour, a page finder, new topics for admins, rules, Site configuration, Server tools and Audit log, and live answers such as "how many admins do I have".
+
+## v23: Motion
+Loading uses a top progress line, a self-drawing tick and skeleton screens; numbers count up; toasts show a timer bar. All motion is disabled when the device asks for reduced motion. Code: `src/components/Motion.jsx`, `src/lib/motion.js`, section "v23 motion system" in `src/styles/global.css`.

@@ -71,6 +71,6 @@ export function mountTeam({ r, db, now, audit, bad, jobs }) {
   jobs?.alerts?.addCheck('staff-logins', ({ raise, resolve }) => {
     const bads = all(`SELECT u.name, COUNT(*) n FROM login_log l JOIN users u ON u.id=l.user_id WHERE l.ok=0 AND l.at>? AND u.role IN ('admin','editor','teacher') GROUP BY l.user_id HAVING n>=5 ORDER BY n DESC`, now() - DAY);
     if (!bads.length) return resolve('staff-logins');
-    raise('staff-logins', { kind: 'security', level: 'warn', title: `Repeated failed sign-ins on ${bads.length} staff account${bads.length > 1 ? 's' : ''}`, body: `${bads.slice(0, 3).map((b) => `${b.name} (${b.n})`).join(', ')} in the last 24 hours. If it is not them, lock the account.`, link: 'team' });
+    raise('staff-logins', { kind: 'security', level: 'warn', title: `Repeated failed sign-ins on ${bads.length} staff account${bads.length > 1 ? 's' : ''}`, body: `${bads.slice(0, 3).map((b) => `${b.name} (${b.n})`).join(', ')} in the last 24 hours. If it is not them, lock the account.`, link: 'administrators' });
   });
 }

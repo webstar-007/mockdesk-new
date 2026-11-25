@@ -1,4 +1,5 @@
 import { lazy, Suspense, useEffect, useState } from 'react';
+import { PageIn } from '../components/Motion.jsx';
 import BrandMark from '../components/BrandMark.jsx';
 import PageNav from '../components/PageNav.jsx';
 import { Link, Navigate, NavLink, Route, Routes, useLocation } from 'react-router-dom';
@@ -23,7 +24,6 @@ const Live = lazy(() => import('./Live.jsx'));
 const Ask = lazy(() => import('./Ask.jsx'));
 const Integrity = lazy(() => import('./Integrity.jsx'));
 const Coverage = lazy(() => import('./Coverage.jsx'));
-const System = lazy(() => import('./System.jsx'));
 const Preview = lazy(() => import('./Preview.jsx'));
 const Announcements = lazy(() => import('./Announcements.jsx'));
 const Notifications = lazy(() => import('./Notifications.jsx'));
@@ -37,7 +37,6 @@ const BatchDetail = lazy(() => import('./Batches.jsx').then((m) => ({ default: m
 import Search from './Search.jsx';
 import { NAV_PERM } from './perms.jsx';
 import { useSite } from '../lib/site.js';
-const Anomalies = lazy(() => import('./Anomalies.jsx'));
 const ImportStudents = lazy(() => import('./ImportStudents.jsx'));
 const DataBackup = lazy(() => import('./DataBackup.jsx'));
 const ControlRoom = lazy(() => import('./ControlRoom.jsx'));
@@ -50,7 +49,8 @@ const Support = lazy(() => import('./Support.jsx'));
 const Alerts = lazy(() => import('./Alerts.jsx'));
 const Tricks = lazy(() => import('./Tricks.jsx'));
 const Help = lazy(() => import('./Help.jsx'));
-const Team = lazy(() => import('./Team.jsx'));
+const Administrators = lazy(() => import('./Administrators.jsx'));
+const AuditPage = lazy(() => import('./Settings.jsx').then((m) => ({ default: m.AuditPage })));
 const Assignments = lazy(() => import('./Assignments.jsx'));
 import AlertBell from './AlertBell.jsx';
 
@@ -60,11 +60,11 @@ const HUBS = [
   { id: 'students', label: 'Students', icon: '👥', tabs: [['users', 'All students'], ['batches', 'Batches'], ['cohorts', 'Cohorts'], ['assignments', 'Assignments'], ['import-students', 'Import'], ['referrals', 'Referrals']] },
   { id: 'tests', label: 'Tests', icon: '🗂', tabs: [['mocks', 'Mocks'], ['calendar', 'Calendar'], ['exams', 'Exams'], ['live', 'Live now'], ['attempts', 'Attempts']] },
   { id: 'questions', label: 'Questions', icon: '❓', tabs: [['bank', 'Question bank'], ['content', 'Import and AI'], ['quality', 'Quality'], ['coverage', 'Coverage'], ['tricks', 'Tricks'], ['reports', 'Student reports']] },
-  { id: 'insights', label: 'Insights', icon: '📊', tabs: [['analytics', 'Analytics'], ['ask', 'Ask your data'], ['integrity', 'Integrity'], ['anomalies', 'Copy check']] },
+  { id: 'insights', label: 'Insights', icon: '📊', tabs: [['analytics', 'Analytics'], ['ask', 'Ask your data'], ['integrity', 'Integrity']] },
   { id: 'comms', label: 'Messages', icon: '📣', tabs: [['support', 'Support inbox'], ['messages', 'Send a message'], ['announcements', 'Announcements'], ['notifications', 'Reminder rules']] },
-  { id: 'server', label: 'Server', icon: '🖥', tabs: [['alerts', 'Alerts'], ['monitor', 'Monitoring'], ['tools', 'Server tools'], ['control', 'Control room'], ['security', 'Security'], ['integrations', 'Integrations'], ['system', 'System'], ['data', 'Data and backup']] },
+  { id: 'server', label: 'Server', icon: '🖥', tabs: [['alerts', 'Alerts'], ['monitor', 'Monitoring'], ['tools', 'Server tools'], ['control', 'Control room'], ['security', 'Security'], ['integrations', 'Integrations'], ['data', 'Data and backup']] },
   { id: 'help', label: 'Help', icon: '💬', tabs: [['help', 'Help']] },
-  { id: 'settings', label: 'Settings', icon: '⚙', tabs: [['settings', 'Settings'], ['team', 'Team activity']] },
+  { id: 'settings', label: 'Settings', icon: '⚙', tabs: [['settings', 'Site configuration'], ['administrators', 'Administrators'], ['audit', 'Audit log']] },
 ];
 
 function AdminNav({ hubs }) {
@@ -110,7 +110,7 @@ export default function AdminApp() {
         <AdminNav hubs={hubs} />
         <HubTabs tabs={(hubs.find(hubOf) || { tabs: [] }).tabs} open={open} sup={sup} />
         <Suspense fallback={<Loading />}>
-          <Routes>
+          <PageIn><Routes>
             <Route index element={editor && !perms.includes('students') ? <Navigate to="/admin/mocks" replace /> : <Overview />} />
             <Route path="users" element={<Users />} />
             <Route path="users/:id" element={<UserDetail />} />
@@ -123,17 +123,19 @@ export default function AdminApp() {
             <Route path="live" element={<Live />} />
             <Route path="ask" element={<Ask />} />
             <Route path="integrity" element={<Integrity />} />
-            <Route path="anomalies" element={<Anomalies />} />
+            <Route path="anomalies" element={<Navigate to="/admin/integrity" replace />} />
             <Route path="import-students" element={<ImportStudents />} />
             <Route path="data" element={<DataBackup />} />
             <Route path="coverage" element={<Coverage />} />
-            <Route path="system" element={<System />} />
+            <Route path="system" element={<Navigate to="/admin/tools" replace />} />
             <Route path="control" element={<ControlRoom />} />
             <Route path="tools" element={<ServerTools />} />
             <Route path="calendar" element={<Calendar />} />
             <Route path="support" element={<Support />} />
             <Route path="alerts" element={<Alerts />} />
-            <Route path="team" element={<Team />} />
+            <Route path="administrators" element={<Administrators />} />
+            <Route path="audit" element={<AuditPage />} />
+            <Route path="team" element={<Navigate to="/admin/administrators" replace />} />
             <Route path="help" element={<Help />} />
             <Route path="tricks" element={<Tricks />} />
             <Route path="assignments" element={<Assignments />} />
@@ -154,7 +156,7 @@ export default function AdminApp() {
             <Route path="referrals" element={<Referrals />} />
             <Route path="settings" element={<Settings />} />
             <Route path="*" element={<Navigate to="/admin" replace />} />
-          </Routes>
+          </Routes></PageIn>
         </Suspense>
       </main>
       {find && <Search onClose={() => setFind(false)} />}

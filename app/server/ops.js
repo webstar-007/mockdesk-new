@@ -35,47 +35,6 @@ const HEADS = { name: ['name', 'student', 'student_name', 'full_name', 'fullname
 const key = (h) => String(h || '').trim().toLowerCase().replace(/[\s-]+/g, '_');
 
 export function mountOps({ r, db, now, audit, bad, results, settings, notifier, page }) {
-  // ---------- answer-copy and shared-device signals ----------
-  const pairKey = (a, b) => [a, b].sort().join('|');
-  r.get('/anomalies', (req, res) => {
-    const days = Math.min(365, Math.max(1, Number(req.query.days) || 60)); const since = now() - days * DAY; const showAll = req.query.dismissed === '1';
-    const meta = new Map(db.prepare("SELECT a.id, a.ip, a.device, u.name FROM attempts a JOIN users u ON u.id=a.user_id WHERE a.mock_id!='practice' AND a.started_at>? AND COALESCE(u.role,'student')='student'").all(since).map((x) => [x.id, x]));
-    const names = new Map(db.prepare('SELECT id, name FROM mocks').all().map((m) => [m.id, m.name]));
-    const gone = new Set(db.prepare('SELECT key FROM anomaly_dismissed').all().map((x) => x.key));
-    const byMock = new Map(); let checked = 0;
-    for (const { row, res: rr } of results()) { if (!meta.has(row.id) || (row.submitted_at || 0) < since) continue; checked++; (byMock.get(row.mock_id) || byMock.set(row.mock_id, []).get(row.mock_id)).push({ row, rr }); }
-    const pairs = [];
-    for (const [mockId, list0] of byMock) {
-      const list = list0.sort((a, b) => b.row.submitted_at - a.row.submitted_at).slice(0, 300).map(({ row, rr }) => {
-        const m = new Map(); let wrong = 0; for (const q of rr.questions) if (q.selected != null) { m.set(q.id, q.selected); if (q.status === 'incorrect') wrong++; }
-        return { id: row.id, userId: row.user_id, startedAt: row.started_at, m, wrong, wrongIds: rr.questions.filter((q) => q.status === 'incorrect').map((q) => q.id), score: rr.summary.score, max: rr.summary.maxMarks };
-      });
-      for (let i = 0; i < list.length; i++) for (let j = i + 1; j < list.length; j++) {
-        const A = list[i], B = list[j]; if (A.userId === B.userId) continue;
-        const small = A.wrongIds.length <= B.wrongIds.length ? A : B, big = small === A ? B : A;
-        let shared = 0; for (const id of small.wrongIds) if (big.m.get(id) === small.m.get(id) && big.m.has(id)) shared++;
-        const lowest = Math.min(A.wrong, B.wrong); if (shared < 5 || !lowest || shared / lowest < 0.6) continue;
-        let common = 0, same = 0; for (const [id, s] of small.m) if (big.m.has(id)) { common++; if (big.m.get(id) === s) same++; }
-        const ma = meta.get(A.id), mb = meta.get(B.id);
-        const sameIp = !!(ma.ip && ma.ip === mb.ip), sameDevice = !!(ma.device && ma.device === mb.device);
-        const level = (shared >= 10 && shared / lowest >= 0.8) || (shared >= 6 && (sameIp || sameDevice)) ? 'high' : 'medium';
-        const k = pairKey(A.id, B.id); if (gone.has(k) && !showAll) continue;
-        pairs.push({ key: k, dismissed: gone.has(k), mockId, mockName: names.get(mockId) || mockId, level, sharedWrong: shared, wrongA: A.wrong, wrongB: B.wrong, agreement: common ? Math.round((same / common) * 100) : 0, minutesApart: Math.round(Math.abs(A.startedAt - B.startedAt) / 60000), sameIp, sameDevice,
-          a: { userId: A.userId, name: ma.name, attemptId: A.id, score: A.score, max: A.max }, b: { userId: B.userId, name: mb.name, attemptId: B.id, score: B.score, max: B.max } });
-      }
-    }
-    pairs.sort((x, y) => (y.level === 'high') - (x.level === 'high') || y.sharedWrong - x.sharedWrong);
-    // Users per device/IP need ids too, so build the id list separately for linking.
-    const usersBy = (col) => { const m = new Map(); for (const x of db.prepare(`SELECT DISTINCT a.${col} v, u.id, u.name FROM attempts a JOIN users u ON u.id=a.user_id WHERE a.${col} IS NOT NULL AND a.mock_id!='practice' AND a.started_at>? AND COALESCE(u.role,'student')='student'`).all(since)) (m.get(x.v) || m.set(x.v, []).get(x.v)).push({ id: x.id, name: x.name }); return [...m].filter(([, u]) => u.length >= 3).map(([v, u]) => ({ id: col === 'device' ? `${String(v).slice(0, 6)}…` : v, users: u })).sort((a, b) => b.users.length - a.users.length).slice(0, 10); };
-    const { size, off } = page(req, 30);
-    res.json({ summary: { checked, days, pairs: pairs.length, high: pairs.filter((p) => p.level === 'high').length, medium: pairs.filter((p) => p.level === 'medium').length }, total: pairs.length, pairs: pairs.slice(off, off + size), devices: usersBy('device'), networks: usersBy('ip') });
-  });
-  r.post('/anomalies/dismiss', (req, res) => {
-    const k = String(req.body?.key || ''); if (!/^[\w-]{8,80}\|[\w-]{8,80}$/.test(k)) return bad(res, 'Invalid pair');
-    if (req.body?.undo) db.prepare('DELETE FROM anomaly_dismissed WHERE key=?').run(k); else db.prepare('INSERT OR IGNORE INTO anomaly_dismissed(key,at,by) VALUES (?,?,?)').run(k, now(), req.user.name);
-    audit(req, req.body?.undo ? 'anomaly_reopen' : 'anomaly_dismiss', k); res.json({ ok: true });
-  });
-
   // ---------- bulk student import ----------
   const batchByName = () => new Map(db.prepare('SELECT id, name FROM batches').all().map((b) => [b.name.trim().toLowerCase(), b]));
   function readRows(csv, batchId) {

@@ -16,6 +16,7 @@ import { mountOps } from './ops.js';
 import { mountControl } from './control.js';
 import { mountAlertCentre } from './alertcentre.js';
 import { mountTeam } from './team.js';
+import { mountAdministrators } from './administrators.js';
 import { mountLoadTest } from './loadtest.js';
 import { mountHelp } from './help.js';
 import { mountTipsAdmin } from './tips.js';
@@ -771,6 +772,7 @@ export function adminRouter({ tips, assign, exitFn, drafter = null, db, now, inv
   mountHelp({ r, db, now, audit, bad, jobs });
   mountLoadTest({ r, db, now, audit, bad, settings, getMock, controls, jobs });
   mountTeam({ r, db, now, audit, bad, jobs });
+  mountAdministrators({ r, db, now, audit, bad, settings, notifier, jobs });
   mountTipsAdmin(r, tips, { db, now, audit, bad, jobs, settings });
   mountControl({ r, db, now, audit, bad, settings, notifier, mailer, creds, live, drafter, otpSender, whatsapp, jobs, metrics, controlsCache: controls, recentErrors });
   mountOps({ r, db, now, audit, bad, results, settings, notifier, page });

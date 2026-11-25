@@ -88,7 +88,7 @@ Admin: `GET /api/admin/cohorts`, `POST /api/admin/cohorts/nudge` (`{segment,titl
 
 ## v11 additions
 - Permissions: staff (`role=editor`) carry `perms` (`content` always, plus `students`, `messages`, `accounts`, `data`, `contacts`). `PATCH /admin/users/:id` accepts `perms` (admin only). Forbidden calls return 403 `{code:'NO_PERMISSION', need}`.
-- `GET /admin/anomalies?days&dismissed&page` and `POST /admin/anomalies/dismiss {key, undo}`.
+- Removed in v22: `/admin/anomalies*` (Copy check).
 - `POST /admin/students/import/preview` and `POST /admin/students/import` `{csv, batchId, invite}`.
 - `GET /admin/backups`, `PUT /admin/backups/config`, `POST /admin/backups`, `GET|DELETE /admin/backups/:name` (admin only).
 - `GET /admin/export` and `GET /admin/export/:kind` (students, results, answers, questions, audit).
@@ -143,3 +143,7 @@ Admin help: `GET /admin/help`, `POST /admin/help/ask`, `GET /admin/help/topic/:i
 Load test additions: `GET /admin/loadtest/report/:id`, `PUT /admin/loadtest/report/:id` (label, note, pinned), `DELETE /admin/loadtest/report/:id`, `GET /admin/loadtest/compare?a=&b=`, `GET/POST /admin/loadtest/presets`, `DELETE /admin/loadtest/presets/:id`. `POST /admin/loadtest/start` also accepts `pattern` (steady|spike|ramp), `rampSec`, `jitter`, `saveSize`, `markPct`, `pollPct`, `resultPct`, `submitSpreadPct`, `errStopPct`, `label`, `note`. `DELETE /admin/loadtest/history` keeps pinned results.
 
 `POST /admin/loadtest/start` also accepts `browsers`, `browsePerMin`, `browserPerMin`, `reviewPct`, `pdfPct`, `pages` (keys from the `pages` list returned by `GET /admin/loadtest`) and `custom` (`[{path, perMin}]`, max 6, GET only).
+
+### v22
+- `GET /admin/administrators` (people, invites, rules, presets, counts), `POST /admin/administrators/invite {contact, role, perms|preset}`, `DELETE /admin/administrators/invites/:id`, `PUT /admin/administrators/:id {role, perms, preset, name}`, `DELETE /admin/administrators/:id`, `PUT /admin/administrators-config`, `POST /admin/administrators-lock-inactive`.
+- `GET /admin/help/checks` (tone-coded quick checks), `GET /admin/help/pages?q` (page finder).

@@ -1,4 +1,5 @@
 import { lazy, Suspense, useEffect } from 'react';
+import { BootLoader, TopProgress } from './components/Motion.jsx';
 import { Link, Navigate, Outlet, Route, Routes, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './lib/auth.jsx';
 import Header from './components/Header.jsx';
@@ -32,7 +33,7 @@ function Maintenance({ message, logout }) {
 function Guard() {
   const { user, logout } = useAuth(); const loc = useLocation(); const site = useSite();
   if (site.maintenance === 'hard' && user && !['admin', 'editor'].includes(user.role)) return <Maintenance message={site.maintenanceMessage} logout={logout} />;
-  if (user === undefined) return <div className="center-page" role="status"><span className="spin" aria-hidden="true" />Loading…</div>;
+  if (user === undefined) return <BootLoader />;
   if (!user) return <Navigate to="/login" replace state={{ from: loc.pathname }} />;
   if ((user.role === 'admin' || user.role === 'editor') && !loc.pathname.startsWith('/admin')) return <Navigate to="/admin" replace />;
   if (user.role === 'teacher' && !loc.pathname.startsWith('/teacher')) return <Navigate to="/teacher" replace />;
@@ -51,7 +52,7 @@ const Shell = ({ children }) => (<><a className="skip" href="#main">Skip to cont
 // "/" is public: visitors see the landing page, signed-in students see their dashboard.
 function Root() {
   const { user, logout } = useAuth(); const site = useSite();
-  if (user === undefined) return <div className="center-page" role="status">Loading…</div>;
+  if (user === undefined) return <BootLoader />;
   if (!user) return <Landing />;
   if (user.role === 'admin' || user.role === 'editor') return <Navigate to="/admin" replace />;
   if (user.role === 'teacher') return <Navigate to="/teacher" replace />;
@@ -71,7 +72,8 @@ export default function App() {
     <AuthProvider>
       <ScrollTop />
       <TipLayer />
-      <Suspense fallback={<div className="center-page" role="status">Loading…</div>}>
+      <TopProgress />
+      <Suspense fallback={<BootLoader />}>
         <Routes>
           <Route path="/" element={<Root />} />
           <Route path="/login" element={<AuthPage mode="login" />} />

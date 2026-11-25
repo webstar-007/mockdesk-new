@@ -34,7 +34,7 @@ export function needFor(method, path) {
   if (get && /^\/calendar$/.test(path)) return 'content';
   if (/^\/batches(\/|$)/.test(path)) return get ? 'students' : 'accounts';
   if (/^\/integrity\/[^/]+$/.test(path) && method === 'PATCH') return 'students';
-  if (get && /^\/(overview|users|attempts|live|integrity|cohorts|analytics|anomalies|referrals)(\/[^/]+)?$/.test(path)) return 'students';
+  if (get && /^\/(overview|users|attempts|live|integrity|cohorts|analytics|referrals)(\/[^/]+)?$/.test(path)) return 'students';
   return 'admin';
 }
 export const maskEmail = (v) => { const s = String(v ?? ''); const i = s.indexOf('@'); return i < 1 ? s : `${s[0]}***${s.slice(i)}`; };

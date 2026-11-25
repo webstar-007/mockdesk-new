@@ -76,20 +76,6 @@ test('staff with students access but not contacts gets masked CSV and no raw con
   const ints = await call('sam', 'GET', '/admin/integrity?level=low&days=90'); assert.equal(ints.status, 200); assert.ok(!JSON.stringify(ints.body).includes(E.ana));
 });
 
-test('anomalies: finds students with the same wrong answers, shared devices and lets an admin dismiss a pair', async () => {
-  db.prepare('UPDATE attempts SET device=? WHERE user_id IN (?,?,?)').run('devicedevice01', uid(E.ana), uid(E.ben), uid(E.cal));
-  const d = (await call('admin', 'GET', '/admin/anomalies')).body;
-  const names = (p) => [p.a.name, p.b.name].sort().join('+');
-  const pair = d.pairs.find((p) => names(p) === 'ana Kumar+cal Kumar'); assert.ok(pair, JSON.stringify(d.pairs.map(names)));
-  assert.ok(pair.sharedWrong >= 5 && pair.sameDevice, JSON.stringify(pair));
-  assert.ok(!d.pairs.some((p) => names(p).includes('ben') && names(p).includes('ana') && p.sharedWrong >= 5 && false));
-  assert.equal(d.devices.length, 1); assert.equal(d.devices[0].users.length, 3);
-  assert.equal((await call('admin', 'POST', '/admin/anomalies/dismiss', { key: pair.key })).status, 200);
-  assert.ok(!(await call('admin', 'GET', '/admin/anomalies')).body.pairs.some((p) => p.key === pair.key));
-  assert.ok((await call('admin', 'GET', '/admin/anomalies?dismissed=1')).body.pairs.some((p) => p.key === pair.key && p.dismissed));
-  assert.equal((await call('admin', 'POST', '/admin/anomalies/dismiss', { key: 'nope' })).status, 400);
-});
-
 test('bulk import: previews problems, creates accounts, adds to a batch, invites by email and is safe to repeat', async () => {
   const batch = (await call('admin', 'POST', '/admin/batches', { name: 'Morning 11' })).body.id;
   const csv = 'Name,Email,Mobile\nNew One,new1@example.com,9811111111\nPhone Only,,9822222222\nAna Again,ana11@example.com,\n,nobody@example.com,\nBad Mail,not-an-email,\nNew One Dup,new1@example.com,\nTeacher?,boss11@example.com,';

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { api } from '../lib/api.js';
 import { tip } from '../components/Tip.jsx';
+import { CountUp, PageSkeleton } from '../components/Motion.jsx';
 
 export function useLoad(url, deps = []) {
   const [s, set] = useState({ data: null, err: '', loading: true });
@@ -12,7 +13,7 @@ export const toast = (msg, tone = 'good') => window.dispatchEvent(new CustomEven
 export function ToastHost() {
   const [list, setList] = useState([]);
   useEffect(() => { const on = (e) => { setList((l) => [...l, e.detail]); setTimeout(() => setList((l) => l.filter((x) => x.id !== e.detail.id)), 4200); }; window.addEventListener('ad-toast', on); return () => window.removeEventListener('ad-toast', on); }, []);
-  return <div className="ad-toasts" aria-live="polite">{list.map((t) => <div key={t.id} className={`ad-toast t-${t.tone}`}>{t.msg}</div>)}</div>;
+  return <div className="ad-toasts" aria-live="polite">{list.map((t) => <div key={t.id} className={`ad-toast t-${t.tone}`}><span className="ad-toast-ico" aria-hidden="true">{t.tone === 'bad' ? '!' : '✓'}</span>{t.msg}<i className="ad-toast-bar" /></div>)}</div>;
 }
 export const dt = (ms) => (ms ? new Date(ms).toLocaleString(undefined, { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '–');
 export const dOnly = (ms) => (ms ? new Date(ms).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' }) : '–');
@@ -20,13 +21,13 @@ export const ago = (ms) => { if (!ms) return 'never'; const s = Math.max(0, (Dat
 export const mmss = (s) => (s == null ? '–' : s >= 3600 ? `${Math.floor(s / 3600)}h ${Math.floor((s % 3600) / 60)}m` : `${Math.floor(s / 60)}m ${String(Math.round(s % 60)).padStart(2, '0')}s`);
 
 export function PageHead({ title, sub, children }) { return <header className="ad-head"><div><h1>{title}</h1>{sub && <p className="muted">{sub}</p>}</div><div className="ad-head-act">{children}</div></header>; }
-export function Stat({ label, value, sub, tone = '', icon }) { return <div className={`ad-stat ${tone}`}><span className="ad-stat-ico" aria-hidden="true">{icon}</span><div><b>{value}</b><span>{label}</span>{sub && <small>{sub}</small>}</div></div>; }
+export function Stat({ label, value, sub, tone = '', icon }) { return <div className={`ad-stat ${tone}`}><span className="ad-stat-ico" aria-hidden="true">{icon}</span><div><b><CountUp value={value} /></b><span>{label}</span>{sub && <small>{sub}</small>}</div></div>; }
 export function Badge({ tone = 'mute', children }) { return <span className={`ad-badge b-${tone}`}>{children}</span>; }
 export const statusTone = { published: 'good', draft: 'warn', archived: 'mute', active: 'good', suspended: 'bad', submitted: 'good', in_progress: 'brand', open: 'warn', resolved: 'good', dismissed: 'mute', admin: 'brand', editor: 'warn', student: 'mute', teacher: 'brand', live: 'good', scheduled: 'brand', ended: 'warn' };
 export const diffTone = { easy: 'good', moderate: 'warn', hard: 'bad' };
 export function Empty({ children }) { return <div className="ad-empty">{children}</div>; }
 export function Err({ children }) { return children ? <div className="alert" role="alert">{children}</div> : null; }
-export function Loading() { return <p className="muted" role="status">Loading…</p>; }
+export function Loading() { return <PageSkeleton />; }
 
 export function Pager({ page, size, total, onPage }) {
   const pages = Math.max(1, Math.ceil(total / size));

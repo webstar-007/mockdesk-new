@@ -199,3 +199,51 @@ p.muted[role=status]{animation:pulse 1.2s ease-in-out infinite}
 .tc-form{margin-top:12px;display:grid;gap:6px}.tc-form label{font-weight:600}.tc-form>div{display:flex;gap:8px}.tc-form input{flex:1;min-width:0}
 .tc-note{color:var(--good)}
 @media(max-width:520px){.tc-corner li{grid-template-columns:auto 1fr}.tc-x{grid-column:2}.tc-form>div{flex-direction:column}}
+
+/* ---- v23 motion system ---- */
+:root{--ease-out:cubic-bezier(.22,1,.36,1);--ease-spring:cubic-bezier(.34,1.56,.64,1)}
+/* top progress line */
+.tp{position:fixed;inset:0 0 auto 0;height:3px;z-index:900;pointer-events:none;opacity:0;transition:opacity .25s}.tp.on{opacity:1}
+.tp i{display:block;height:100%;background:linear-gradient(90deg,var(--brand-2),var(--brand),#22d3ee);border-radius:0 3px 3px 0;transition:width .22s ease-out;position:relative}
+.tp i::after{content:"";position:absolute;right:0;top:0;width:90px;height:100%;background:linear-gradient(90deg,transparent,rgba(255,255,255,.75));filter:blur(2px);animation:tp-glint 1s ease-in-out infinite}
+@keyframes tp-glint{0%,100%{opacity:.25}50%{opacity:.9}}
+/* the tick that draws itself */
+.tk-load{display:inline-block}.tk-load svg{width:100%;height:100%;overflow:visible}
+.tk-box{fill:none;stroke:url(#tkg);stroke-width:3.5;stroke-linecap:round;stroke-dasharray:100;stroke-dashoffset:100;animation:tk-box 1.7s var(--ease-out) infinite}
+.tk-check{fill:none;stroke:var(--brand);stroke-width:4.5;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:100;stroke-dashoffset:100;animation:tk-check 1.7s var(--ease-out) infinite}
+@keyframes tk-box{0%{stroke-dashoffset:100;opacity:1}45%,80%{stroke-dashoffset:0;opacity:1}100%{stroke-dashoffset:0;opacity:0}}
+@keyframes tk-check{0%,28%{stroke-dashoffset:100;opacity:1}58%,80%{stroke-dashoffset:0;opacity:1}100%{stroke-dashoffset:0;opacity:0}}
+.tk-boot{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;animation:fade-in .3s both}.tk-cap{margin:0;animation:none!important}
+/* skeletons */
+.sk{border-radius:10px;background:linear-gradient(100deg,var(--line) 30%,color-mix(in srgb,var(--line) 40%,var(--surface)) 50%,var(--line) 70%);background-size:300% 100%;animation:sk-shimmer 1.4s linear infinite;animation-delay:calc(var(--i,0)*.12s)}
+@keyframes sk-shimmer{from{background-position:100% 0}to{background-position:0 0}}
+.sk-page{display:grid;gap:16px;animation:fade-in .25s both}.sk-title{height:30px;width:min(280px,60%)}.sk-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px}.sk-tile{height:78px;border-radius:14px}
+.sk-card{display:grid;gap:12px;padding:18px;background:var(--surface);border:1px solid var(--line);border-radius:14px}.sk-line{height:14px}
+/* page and list entrances */
+.page-in{animation:page-in .38s var(--ease-out) both}
+@keyframes page-in{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+.ad-grid>*,.ad-stats>*,.sk-row>*{animation:rise-in .5s var(--ease-out) backwards}
+.ad-grid>*:nth-child(2){animation-delay:.04s}.ad-grid>*:nth-child(3){animation-delay:.08s}.ad-grid>*:nth-child(4){animation-delay:.12s}.ad-grid>*:nth-child(n+5){animation-delay:.16s}
+.ad-table tbody tr{animation:row-in .35s var(--ease-out) backwards}.ad-table tbody tr:nth-child(2){animation-delay:.02s}.ad-table tbody tr:nth-child(3){animation-delay:.04s}.ad-table tbody tr:nth-child(4){animation-delay:.06s}.ad-table tbody tr:nth-child(5){animation-delay:.08s}.ad-table tbody tr:nth-child(6){animation-delay:.10s}.ad-table tbody tr:nth-child(n+7){animation-delay:.12s}
+@keyframes rise-in{from{opacity:0;transform:translateY(14px) scale(.985)}to{opacity:1;transform:none}}
+@keyframes row-in{from{opacity:0;transform:translateX(-8px)}to{opacity:1;transform:none}}
+/* touch feedback */
+.btn{transition:transform .15s var(--ease-spring),filter .15s,background-color .15s,box-shadow .2s}.btn:active:not(:disabled){transform:scale(.96)}
+.btn-primary:hover:not(:disabled){box-shadow:0 8px 20px -8px var(--brand)}
+.chip,.ad-badge{transition:transform .15s var(--ease-spring),background-color .15s}.chip:active{transform:scale(.94)}
+.ad-stat{transition:transform .25s var(--ease-out),box-shadow .25s}.ad-stat:hover{transform:translateY(-3px);box-shadow:0 14px 30px -14px rgba(30,58,138,.35)}
+.ad-stat-ico{transition:transform .35s var(--ease-spring)}.ad-stat:hover .ad-stat-ico{transform:rotate(-8deg) scale(1.12)}
+.modal{animation:pop-in .28s var(--ease-spring) both}
+/* toasts: slide in, tick pops, timer bar shrinks */
+.ad-toast{position:relative;display:flex;align-items:center;gap:10px;overflow:hidden;animation:toast-in .4s var(--ease-spring) both}
+.ad-toast-ico{width:20px;height:20px;border-radius:50%;display:grid;place-items:center;font-size:.72rem;background:#34d399;color:#052e1b;animation:tick-pop .45s .15s var(--ease-spring) both}.ad-toast.t-bad .ad-toast-ico{background:#f87171;color:#450a0a}.ad-toast.t-warn .ad-toast-ico{background:#fbbf24;color:#451a03}
+.ad-toast-bar{position:absolute;left:0;bottom:0;height:3px;width:100%;background:rgba(255,255,255,.55);transform-origin:left;animation:toast-bar 4.2s linear both}
+@keyframes toast-in{from{opacity:0;transform:translateX(40px) scale(.96)}to{opacity:1;transform:none}}
+@keyframes tick-pop{from{transform:scale(0) rotate(-40deg)}to{transform:none}}
+@keyframes toast-bar{to{transform:scaleX(0)}}
+/* waiting text gets bouncing dots instead of a plain pulse */
+p.muted[role=status]{animation:none;display:inline-flex;align-items:center;gap:8px}
+p.muted[role=status]::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--brand);box-shadow:14px 0 0 var(--brand-2),28px 0 0 var(--brand);margin-right:30px;animation:dots 1s ease-in-out infinite}
+@keyframes dots{0%,100%{transform:translateY(0);opacity:.5}50%{transform:translateY(-4px);opacity:1}}
+.tk-boot p.muted[role=status]::before{display:none}
+@media (prefers-reduced-motion:reduce){.tp i::after,.sk,.tk-box,.tk-check,.page-in,.ad-grid>*,.ad-stats>*,.ad-table tbody tr,.ad-toast,.ad-toast-ico,.ad-toast-bar,p.muted[role=status]::before{animation:none!important}.tk-box,.tk-check{stroke-dashoffset:0}.ad-stat:hover,.btn:active:not(:disabled){transform:none}}

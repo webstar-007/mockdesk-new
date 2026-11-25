@@ -75,6 +75,9 @@ export default function Help() {
   const [sp] = useSearchParams(); const from = sp.get('from') || ''; const initQ = sp.get('q') || '';
   const [msgs, setMsgs] = useState(load); const [q, setQ] = useState(''); const [busy, setBusy] = useState(false); const [meta, setMeta] = useState(null); const [area, setArea] = useState(null); const [pageTopics, setPageTopics] = useState([]); const [tab, setTab] = useState('ask');
   const box = useRef(null); const inp = useRef(null); const end = useRef(null);
+  const [checks, setChecks] = useState([]); const [pf, setPf] = useState(''); const [pages, setPages] = useState([]);
+  useEffect(() => { api.get('/admin/help/checks').then((d) => setChecks(d.checks || [])).catch(() => {}); }, []);
+  useEffect(() => { const h = setTimeout(() => { api.get(`/admin/help/pages?q=${encodeURIComponent(pf)}`).then((d) => setPages(d.pages || [])).catch(() => {}); }, 200); return () => clearTimeout(h); }, [pf]);
   useEffect(() => { api.get('/admin/help').then(setMeta).catch(() => setMeta({ areas: [], suggested: [], popular: [], recent: [] })); }, []);
   useEffect(() => { if (from) api.get(`/admin/help/page?path=${encodeURIComponent(from)}`).then((r) => setPageTopics(r.topics)).catch(() => {}); }, [from]);
   useEffect(() => { save(msgs); end.current?.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' }); }, [msgs]);
@@ -105,6 +108,10 @@ export default function Help() {
                 <div className="hp-empty">
                   <h3>What do you want to do?</h3>
                   <p className="muted">Type a question in your own words. For example “how do I lock a teacher’s account” or “how much disk space is left”.</p>
+                  {checks.length > 0 && <div className="hp-checks" aria-label="Quick checks">{checks.map((c) => <Link key={c.key} to={c.to} className={`hp-check t-${c.tone}`}><span>{c.label}</span><b>{c.value}</b></Link>)}</div>}
+                  <p className="small muted" style={{ marginTop: 14 }}>Find a page</p>
+                  <input className="input" value={pf} onChange={(e) => setPf(e.target.value)} placeholder="Type a page name, for example backup" aria-label="Find a page" style={{ maxWidth: 320 }} />
+                  <div className="hp-chips" style={{ marginTop: 8 }}>{pages.map((g) => <Link key={g.to} className="chip" to={g.to}>{g.label}</Link>)}</div>
                   <div className="hp-chips">{(meta?.suggested || []).map((s) => <button key={s} className="chip" onClick={() => ask(s)}>{s}</button>)}</div>
                   {meta?.recent?.length > 0 && <><p className="small muted" style={{ marginTop: 14 }}>Your recent questions</p><div className="hp-chips">{meta.recent.map((s) => <button key={s} className="chip ghost" onClick={() => ask(s)}>{s}</button>)}</div></>}
                 </div>)}

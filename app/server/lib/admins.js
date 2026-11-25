@@ -24,5 +24,13 @@ export function promoteAdmins(db) {
   for (const e of editorEmails) ed('email', e); for (const p of editorPhones) ed('phone', p);
   const up = (col, v) => { n += Number(db.prepare(`UPDATE users SET role='admin' WHERE ${col}=? AND (role IS NULL OR role!='admin')`).run(v).changes); };
   for (const e of emails) up('email', e); for (const p of phones) up('phone', p);
+  // people invited from Settings > Administrators who have now signed up
+  try {
+    for (const i of db.prepare('SELECT * FROM admin_invites').all()) {
+      const u = db.prepare(`SELECT id, role FROM users WHERE ${i.kind === 'email' ? 'email' : 'phone'}=?`).get(i.contact); if (!u) continue;
+      if (u.role !== 'admin') { db.prepare('UPDATE users SET role=?, perms=? WHERE id=?').run(i.role, i.role === 'editor' ? i.perms : null, u.id); n += 1; }
+      db.prepare('DELETE FROM admin_invites WHERE id=?').run(i.id);
+    }
+  } catch { /* table may not exist on an old database */ }
   return n;
 }

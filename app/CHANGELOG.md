@@ -1,5 +1,13 @@
 # What's new in MockDesk
 
+## v23: Motion pass
+**Loading.** A thin glowing progress line at the top follows real requests and page changes. The logo tick draws itself while the app boots or a page loads. Admin pages show a skeleton (stat tiles and a table shimmering) instead of the word "Loading", and only after 150 ms so quick loads never flash. Other "Loading…" lines get bouncing dots.
+**Feel.** Admin pages ease in on every route change, cards rise in one after another, and table rows slide in. Stat numbers count up. Buttons press down and spring back, stat cards lift on hover, dialogs pop with a spring. Toasts slide in with a tick that pops and a timer bar that shrinks.
+Everything switches off for people who ask their device for reduced motion.
+
+## v22: Administrators, Site configuration, Server tools and Help
+**Settings > Administrators** is rebuilt: live list with filters and search, Invite by email or phone, Manage (role, presets or ticked areas), Remove access, per-person Activity, Lock/Unlock/Sign out, and Rules (admin cap, notify admins, default preset, idle-staff flag and one-click lock). **Site and limits** is now **Site configuration**. **Exam pattern** is removed. **Server > System** is merged into **Server tools > Health and restart**. **Insights > Copy check** is removed. **Help** gets quick-check tiles, a page finder, new topics and live answers about admins; old page names in Help were fixed.
+
 ## v21: Help assistant, topper tricks, stamina curve and load simulator
 **Help (top bar and Help in the side menu).** Ask anything about the platform in plain words ("how do I lock a teacher account?", "how many students can my server handle?"). You get the answer, checkable steps, a button that opens the right page, related questions and thumbs up/down. It understands typos, answers live questions from your data (student counts, who is online, disk space, last backup, open tickets, platform status), can show help for the page you came from, and keeps a "Missing answers" list of questions it could not answer so you can see what is unclear. It works offline: nothing is sent to an outside service.
 **Topper Trick Corner (review page).** Students in the top 10% of a mock (or teachers) can post a one-line "how I solved this in 20 seconds" shortcut under a question they got right. Others upvote, report, and teachers add a Teacher Verified badge. Three reports hide a tip automatically; authors are notified of verification and upvote milestones. Teachers manage tips at Teacher > Tricks; admins at Questions > Tricks, where the rules (top %, minimum students, limits) can be changed. A feature switch turns it off.

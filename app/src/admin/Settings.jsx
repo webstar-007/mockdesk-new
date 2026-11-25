@@ -4,11 +4,16 @@ import { refreshSite } from '../lib/site.js';
 import { Badge, Empty, Err, Loading, PageHead, Pager, dt, toast, useLoad } from './ui.jsx';
 
 export default function Settings() {
-  const [tab, setTab] = useState('site');
   return (<>
-    <PageHead title="Settings" sub="Site name and contact, limits, administrators, the exam pattern and the activity log. Backups are under Data and backup." />
-    <div className="ad-tabs" role="tablist">{[['site', 'Site and limits'], ['adm', 'Administrators'], ['pat', 'Exam pattern'], ['aud', 'Audit log']].map(([k, n]) => <button key={k} role="tab" aria-selected={tab === k} className={tab === k ? 'on' : ''} onClick={() => setTab(k)}>{n}</button>)}</div>
-    {tab === 'site' && <Site />}{tab === 'adm' && <Admins />}{tab === 'pat' && <Pattern />}{tab === 'aud' && <Audit />}
+    <PageHead title="Site configuration" sub="Site name and contact, logo and colour, home page text, limits and sign-in rules. People who can run the platform are under Administrators; backups are under Data and backup." />
+    <Site />
+  </>);
+}
+
+export function AuditPage() {
+  return (<>
+    <PageHead title="Audit log" sub="Every change an admin or staff member made, newest first." />
+    <Audit />
   </>);
 }
 
@@ -83,30 +88,6 @@ function Site() {
       <Err>{bad}</Err>{msg && <p className="okmsg" role="status">{msg}</p>}
       <div style={{ marginTop: 14 }}><button className="btn btn-primary" disabled={busy} onClick={save}>Save changes</button></div>
     </>
-  );
-}
-function Pattern() {
-  const { data: d, err, loading } = useLoad('/admin/pattern'); if (loading) return <Loading />; if (err) return <Err>{err}</Err>;
-  return (
-    <div className="ad-grid g2">
-      <section className="card"><h3>{d.exam.name}</h3><dl className="ad-kv">{Object.entries(d.sections).map(([k, s]) => <><dt key={k + 'a'}>{s.name}</dt><dd key={k + 'b'}>{s.questions} q · +{s.marksPerQuestion}/−{s.negativeMarks}{s.qualifying ? ` · qualifying ${s.qualifyingMarks}` : ''}</dd></>)}</dl></section>
-      <section className="card"><h3>Timing and facts</h3><dl className="ad-kv">{d.segments.map((g) => <><dt key={g.id + 'a'}>{g.sections.map((x) => d.sections[x].short).join(' + ')}</dt><dd key={g.id + 'b'}>{g.minutes} min</dd></>)}<dt>Options per question</dt><dd>{d.optionsPerQuestion}</dd><dt>Uploaded images</dt><dd>{d.uploads}</dd></dl>
-        <h4 style={{ marginTop: 16 }}>Admins</h4><ul style={{ margin: 0, paddingLeft: 18 }}>{d.admins.map((a) => <li key={a.email}>{a.name} <small className="muted">{a.email}</small></li>)}</ul>
-        <p className="small muted" style={{ marginTop: 14 }}>The pattern itself lives in <code>config/exam.config.js</code> and is applied to every mock, the timer, scoring and results. Edit that file and restart the server when SSC changes the paper.</p></section>
-    </div>
-  );
-}
-function Admins() {
-  const { data: d, err, loading } = useLoad('/admin/pattern'); if (loading) return <Loading />; if (err) return <Err>{err}</Err>;
-  const e = d.adminEntries;
-  return (
-    <div className="ad-grid g2">
-      <section className="card"><h3>Admins and editors</h3><ul style={{ margin: 0, paddingLeft: 18 }}>{d.admins.map((a) => <li key={a.email}>{a.name} <small className="muted">{a.email}</small> <Badge tone={a.role === 'admin' ? 'brand' : 'warn'}>{a.role}</Badge></li>)}</ul><p className="small muted" style={{ marginTop: 12 }}>Change a role from Users → the user → Change role. Admins can do everything. Editors can only manage mocks, questions and reports, and cannot see student data.</p></section>
-      <section className="card"><h3>The admins.txt file</h3><p className="small">Open <code>admins.txt</code> in the MockDesk folder and paste emails or mobile numbers, one per line. Those people become admins the next time they sign in or sign up. Add the word <code>editor</code> after a line (for example <code>teacher@gmail.com editor</code>) to give content rights only.</p><p className="small muted">File location: <code>{d.adminsFile}</code></p>
-        <h4>Listed in the file now</h4>{e.emails.length + e.phones.length + e.editorEmails.length + e.editorPhones.length ? <ul style={{ margin: 0, paddingLeft: 18 }}>{[...e.emails, ...e.phones].map((x) => <li key={x}>{x} <Badge tone="brand">admin</Badge></li>)}{[...e.editorEmails, ...e.editorPhones].map((x) => <li key={x}>{x} <Badge tone="warn">editor</Badge></li>)}</ul> : <p className="small muted">Nothing yet.</p>}
-        {e.ignored.length > 0 && <div className="ad-check warn" style={{ marginTop: 10 }}><b>Could not read these lines</b><ul>{e.ignored.map((x) => <li key={x}>{x}</li>)}</ul></div>}
-        <p className="small muted" style={{ marginTop: 12 }}>Removing a line later does not take rights away. Use Remove admin rights on the user page for that.</p></section>
-    </div>
   );
 }
 function Audit() {

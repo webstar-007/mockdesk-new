@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import { KB, AREAS, SYNONYMS, STOP, SUGGESTED } from './helpkb.js';
 import { dbFile } from './lib/restore.js';
 import { listBackups } from './ops.js';
-import { startedAt } from './lib/health.js';
+import { startedAt, recentErrors } from './lib/health.js';
 
 const norm = (s) => String(s || '').toLowerCase().replace(/[’']/g, '').replace(/[^a-z0-9+ ]+/g, ' ').replace(/\s+/g, ' ').trim();
 const stem = (w) => (w.length > 4 && w.endsWith('ies') ? `${w.slice(0, -3)}y` : w.length > 4 && w.endsWith('ing') ? w.slice(0, -3) : w.length > 3 && w.endsWith('es') && /(ch|sh|x|ss)es$/.test(w) ? w.slice(0, -2) : w.length > 3 && w.endsWith('s') && !w.endsWith('ss') ? w.slice(0, -1) : w.length > 4 && w.endsWith('ed') ? w.slice(0, -2) : w);
@@ -52,7 +52,7 @@ export function mountHelp({ r, db, now, audit, bad, jobs }) {
       title = 'Who is on the platform'; go = [{ label: 'Open Live now', to: '/admin/live' }];
       L.push(['Students active in the last 5 minutes', one(`SELECT COUNT(*) c FROM users WHERE COALESCE(role,'student')='student' AND last_seen>? AND email NOT LIKE '${SIM}'`, t - 300000).c], ['Tests in progress', one("SELECT COUNT(*) c FROM attempts WHERE status='in_progress' AND mock_id!='__loadtest__'").c], ['Staff and teachers active', one("SELECT COUNT(*) c FROM users WHERE role IN ('admin','editor','teacher') AND last_seen>?", t - 300000).c]);
     } else if (/\b(disk|storage|space)\b/.test(s) && /\b(left|free|used|much|full|available|enough|low)\b/.test(s)) {
-      title = 'Disk space'; go = [{ label: 'Open System checks', to: '/admin/system' }];
+      title = 'Disk space'; go = [{ label: 'Open Server tools', to: '/admin/tools' }];
       try { const f = dbFile(db); const st = fs.statfsSync(f ? f.replace(/[^/]*$/, '') || '.' : '.'); const total = st.blocks * st.bsize, free = st.bavail * st.bsize; L.push(['Free', `${(free / 1073741824).toFixed(1)} GB`], ['Total', `${(total / 1073741824).toFixed(1)} GB`], ['Used', `${Math.round(((total - free) / total) * 100)}%`], ['Database size', `${Math.round((fs.statSync(f).size) / 1048576)} MB`]); } catch { L.push(['Disk', 'could not be read here']); }
     } else if (/\b(last|latest|recent|when)\b.*\bbackup\b|\bbackup\b.*\b(when|last|latest|taken|ok|working)\b/.test(s)) {
       title = 'Backups'; go = [{ label: 'Open Data and backup', to: '/admin/data' }];
@@ -63,6 +63,9 @@ export function mountHelp({ r, db, now, audit, bad, jobs }) {
     } else if (/\b(pending|open|new|unresolved)\b.*\b(report|reported)/.test(s)) {
       title = 'Reported questions'; go = [{ label: 'Open Student reports', to: '/admin/reports' }];
       L.push(['Open reports', one("SELECT COUNT(*) c FROM reports WHERE status='open'").c]);
+    } else if (/\b(how many|who|list|number of)\b.*\b(admin|admins|administrator|administrators|staff|editor|editors)\b/.test(s)) {
+      title = 'Admins and staff'; go = [{ label: 'Open Administrators', to: '/admin/administrators' }];
+      L.push(['Admins', one("SELECT COUNT(*) c FROM users WHERE role='admin'").c], ['Staff', one("SELECT COUNT(*) c FROM users WHERE role='editor'").c], ['Teachers', one("SELECT COUNT(*) c FROM users WHERE role='teacher'").c], ['Online now (last 5 min)', one("SELECT COUNT(*) c FROM users WHERE role IN ('admin','editor','teacher') AND last_seen>?", t - 300000).c]);
     } else if (/\b(any|is there|are there)\b.*\b(problem|issue|alert|wrong|error)|\b(is|are)\b.*\b(server|site|platform|everything|system|app)\b.*\b(ok|okay|fine|healthy|working|up|running)|\b(status|health check|how is the (server|platform|site))\b/.test(s)) {
       title = 'Platform status'; go = [{ label: 'Open Alerts', to: '/admin/alerts' }, { label: 'Open Monitoring', to: '/admin/monitor' }];
       let n = { bad: 0, warn: 0, info: 0 }; try { for (const x of all('SELECT level, COUNT(*) c FROM admin_alerts WHERE resolved_at IS NULL AND (snooze_until IS NULL OR snooze_until<?) GROUP BY level', t)) n[x.level] = x.c; } catch { /* no alerts table yet */ }
@@ -97,6 +100,27 @@ export function mountHelp({ r, db, now, audit, bad, jobs }) {
     res.json(out);
   });
 
+  // quick checks: a few live health facts with a tone (good / warn / bad) and a page to open
+  function checks() {
+    const t = now(); const out = [];
+    const a = (() => { try { return one('SELECT SUM(level=\'bad\') b, COUNT(*) c FROM admin_alerts WHERE resolved_at IS NULL AND (snooze_until IS NULL OR snooze_until<?)', t); } catch { return { b: 0, c: 0 }; } })();
+    out.push({ key: 'alerts', label: 'Alerts', value: a.c ? `${a.c} open` : 'All clear', tone: a.b ? 'bad' : a.c ? 'warn' : 'good', to: '/admin/alerts' });
+    let errs = 0; try { errs = recentErrors().filter((e) => t - (e.at || 0) < 3600000).length; } catch { /* none */ }
+    out.push({ key: 'errors', label: 'Server errors (1 h)', value: errs, tone: errs > 10 ? 'bad' : errs ? 'warn' : 'good', to: '/admin/monitor' });
+    try { const b = listBackups(); const age = b[0] ? (t - (b[0].at || b[0].mtime || 0)) / 86400000 : 999; out.push({ key: 'backup', label: 'Latest backup', value: b[0] ? (age < 1 ? 'Today' : `${Math.floor(age)} days ago`) : 'None yet', tone: age > 7 ? 'bad' : age > 2 ? 'warn' : 'good', to: '/admin/data' }); } catch { /* skip */ }
+    try { const f = dbFile(db); const st = fs.statfsSync(f ? f.replace(/[^/]*$/, '') || '.' : '.'); const used = 1 - st.bavail / st.blocks; out.push({ key: 'disk', label: 'Disk used', value: `${Math.round(used * 100)}%`, tone: used > 0.9 ? 'bad' : used > 0.8 ? 'warn' : 'good', to: '/admin/tools' }); } catch { /* skip */ }
+    const tk = one("SELECT COUNT(*) c FROM tickets WHERE status='open' AND last_from='student'").c;
+    out.push({ key: 'support', label: 'Waiting for reply', value: tk, tone: tk > 10 ? 'warn' : 'good', to: '/admin/support' });
+    return out;
+  }
+  r.get('/help/checks', (req, res) => res.json({ checks: checks() }));
+  // page finder: every page a topic links to, searchable by its label
+  r.get('/help/pages', (req, res) => {
+    const q = norm(req.query.q || ''); const seen = new Map();
+    for (const e of KB) for (const [label, to] of e.go || []) if (!seen.has(to)) seen.set(to, { label, to, topic: e.id });
+    let list = [...seen.values()]; if (q) list = list.filter((p) => norm(p.label).includes(q) || p.to.includes(q));
+    res.json({ pages: list.slice(0, 12) });
+  });
   r.get('/help/topic/:id', (req, res) => { const e = byId.get(req.params.id); if (!e) return bad(res, 'Topic not found', 404); db.prepare('INSERT INTO help_log(user_id,q,matched,score,at) VALUES (?,?,?,?,?)').run(req.user.id, `[opened] ${e.title}`, e.id, 99, now()); res.json({ card: card(e) }); });
   r.get('/help/area/:name', (req, res) => { const list = KB.filter((e) => e.area === req.params.name); if (!list.length) return bad(res, 'Not found', 404); res.json({ area: req.params.name, topics: list.map((e) => ({ id: e.id, title: e.title })) }); });
   // help for the page the admin is on: topics whose "open this page" link points here

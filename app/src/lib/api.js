@@ -2,7 +2,12 @@ export class ApiError extends Error {
   constructor(message, status, code) { super(message); this.status = status; this.code = code; }
 }
 function deviceId() { try { let d = localStorage.getItem('md_device'); if (!d) { d = (crypto.randomUUID?.() || String(Math.random()).slice(2) + Date.now()).replace(/[^\w-]/g, ''); localStorage.setItem('md_device', d); } return d; } catch { return ''; } }
+import { busy } from './motion.js';
 async function req(method, url, body) {
+  busy.start();
+  try { return await req0(method, url, body); } finally { busy.end(); }
+}
+async function req0(method, url, body) {
   let res;
   try {
     res = await fetch('/api' + url, { method, credentials: 'same-origin', headers: { ...(body ? { 'Content-Type': 'application/json' } : {}), ...(deviceId() ? { 'X-Device-Id': deviceId() } : {}) }, body: body ? JSON.stringify(body) : undefined });

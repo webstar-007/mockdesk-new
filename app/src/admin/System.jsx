@@ -5,7 +5,7 @@ import { Badge, Empty, Err, Loading, PageHead, Stat, ago, dt, toast, useLoad } f
 const mb = (b) => (b >= 1073741824 ? `${(b / 1073741824).toFixed(1)} GB` : b >= 1048576 ? `${(b / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(b / 1024))} KB`);
 const dur = (s) => { const d = Math.floor(s / 86400), h = Math.floor((s % 86400) / 3600), m = Math.floor((s % 3600) / 60); return d ? `${d}d ${h}h` : h ? `${h}h ${m}m` : `${m}m`; };
 const dot = { ok: '✅', warn: '🟠', bad: '🔴' };
-export default function System() {
+export default function System({ embedded = false }) {
   const { data: d, err, loading, reload } = useLoad('/admin/system'); const [busy, setBusy] = useState(false); const [dbmsg, setDbmsg] = useState('');
   useEffect(() => { const t = setInterval(reload, 30000); return () => clearInterval(t); }, [reload]);
   if (loading && !d) return <Loading />; if (err) return <Err>{err}</Err>;
@@ -14,10 +14,8 @@ export default function System() {
   const worst = d.checks.some((c) => c.level === 'bad') ? 'bad' : d.checks.some((c) => c.level === 'warn') ? 'warn' : 'ok';
   return (
     <>
-      <PageHead title="System" sub="Is the server healthy? Updates every 30 seconds.">
-        <button className="btn btn-ghost" onClick={reload}>↻ Refresh</button>
-        <a className="btn btn-primary" href="/api/admin/backup">⬇ Download backup</a>
-      </PageHead>
+      {embedded ? <div className="ad-pill-row" style={{ justifyContent: 'space-between', marginBottom: 10 }}><span className="muted small">Is the server healthy? Updates every 30 seconds.</span><span><button className="btn btn-ghost btn-sm" onClick={reload}>↻ Refresh</button> <a className="btn btn-primary btn-sm" href="/api/admin/backup">⬇ Download backup</a></span></div>
+        : <PageHead title="System" sub="Is the server healthy? Updates every 30 seconds."><button className="btn btn-ghost" onClick={reload}>↻ Refresh</button><a className="btn btn-primary" href="/api/admin/backup">⬇ Download backup</a></PageHead>}
       <div className={`ad-banner ${worst}`} role="status">{worst === 'ok' ? '✅ Everything looks fine.' : worst === 'warn' ? '🟠 A few things need attention.' : '🔴 Something needs fixing now.'}</div>
       <div className="ad-grid g4">
         <Stat icon="⏱" label="Uptime" value={dur(d.uptimeSec)} sub={`Started ${dt(d.startedAt)}`} />

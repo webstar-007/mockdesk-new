@@ -153,7 +153,7 @@ test('help: answers plain questions, fixes typos, shows live facts, logs gaps, t
   const fb = await call('boss', 'POST', '/admin/help/feedback', { logId: none.logId, helpful: false, note: 'looking for pricing' }); assert.equal(fb.status, 200);
   const gaps = (await call('boss', 'GET', '/admin/help/gaps')).body; assert.ok(gaps.gaps.some((g) => g.q === 'zzzz qqqq wwww'));
   const t = (await call('boss', 'GET', '/admin/help/topic/tricks')).body.card; assert.ok(t.related.length >= 1);
-  assert.ok((await call('boss', 'GET', '/admin/help/page?path=/admin/team')).body.topics.some((x) => x.id === 'team-activity'));
+  assert.ok((await call('boss', 'GET', '/admin/help/page?path=/admin/administrators')).body.topics.some((x) => x.id === 'team-activity'));
   assert.ok((await call('boss', 'GET', '/admin/help')).body.areas.length >= 8);
 });
 

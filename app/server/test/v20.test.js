@@ -89,5 +89,5 @@ test('team: list, activity, sign-out, lockout, unlock, lock-all', async () => {
 test('team: repeated failed staff sign-ins raise an alert', async () => {
   for (let i = 0; i < 6; i++) db.prepare('INSERT INTO login_log(at,user_id,who,ok,method,ip,ua,note) VALUES (?,?,?,?,?,?,?,?)').run(clock, idOf('boss2_20@example.com'), 'boss2_20@example.com', 0, 'password', '1.2.3.4', 'x', 'bad password');
   await call('boss', 'POST', '/admin/alert-center/check');
-  const a = (await call('boss', 'GET', '/admin/alert-center')).body.items; assert.ok(a.some((x) => /failed sign-ins/.test(x.title) && x.link === 'team'), JSON.stringify(a.map((x) => x.title)));
+  const a = (await call('boss', 'GET', '/admin/alert-center')).body.items; assert.ok(a.some((x) => /failed sign-ins/.test(x.title) && x.link === 'administrators'), JSON.stringify(a.map((x) => x.title)));
 });
