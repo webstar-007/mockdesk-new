@@ -32,6 +32,10 @@ export function needFor(method, path) {
   if (/^\/tickets(\/|$)/.test(path)) return 'support';
   if (/^\/students\/import(\/|$)/.test(path)) return 'accounts';
   if (get && /^\/calendar$/.test(path)) return 'content';
+  if (/^\/batch-health(\/|$)/.test(path)) return get ? 'students' : 'messages';
+  if (/^\/desk(\/|$)/.test(path)) return 'support';
+  if (/^\/certificates(\/|$)/.test(path)) return get ? 'students' : 'admin';
+  if (/^\/mock-reminders(\/|$)/.test(path)) return get ? 'content' : 'messages';
   if (/^\/batches(\/|$)/.test(path)) return get ? 'students' : 'accounts';
   if (/^\/integrity\/[^/]+$/.test(path) && method === 'PATCH') return 'students';
   if (get && /^\/(overview|users|attempts|live|integrity|cohorts|analytics|referrals)(\/[^/]+)?$/.test(path)) return 'students';

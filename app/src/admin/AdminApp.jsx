@@ -27,6 +27,9 @@ const Coverage = lazy(() => import('./Coverage.jsx'));
 const Preview = lazy(() => import('./Preview.jsx'));
 const Announcements = lazy(() => import('./Announcements.jsx'));
 const Notifications = lazy(() => import('./Notifications.jsx'));
+const BatchHealth = lazy(() => import('./BatchHealth.jsx'));
+const Desk = lazy(() => import('./Desk.jsx'));
+const Certs = lazy(() => import('./Certs.jsx'));
 const Quality = lazy(() => import('./Quality.jsx'));
 const Cohorts = lazy(() => import('./Cohorts.jsx'));
 const Messages = lazy(() => import('./Messages.jsx'));
@@ -57,11 +60,11 @@ import AlertBell from './AlertBell.jsx';
 // Eight hubs instead of thirty tabs. Each hub groups related pages; every page keeps its own address.
 const HUBS = [
   { id: '', label: 'Dashboard', icon: '▦', tabs: [['', 'Dashboard']] },
-  { id: 'students', label: 'Students', icon: '👥', tabs: [['users', 'All students'], ['batches', 'Batches'], ['cohorts', 'Cohorts'], ['assignments', 'Assignments'], ['import-students', 'Import'], ['referrals', 'Referrals']] },
+  { id: 'students', label: 'Students', icon: '👥', tabs: [['users', 'All students'], ['batches', 'Batches'], ['batch-health', 'Batch health'], ['cohorts', 'Cohorts'], ['assignments', 'Assignments'], ['import-students', 'Import'], ['referrals', 'Referrals'], ['certificates', 'Certificates']] },
   { id: 'tests', label: 'Tests', icon: '🗂', tabs: [['mocks', 'Mocks'], ['calendar', 'Calendar'], ['exams', 'Exams'], ['live', 'Live now'], ['attempts', 'Attempts']] },
   { id: 'questions', label: 'Questions', icon: '❓', tabs: [['bank', 'Question bank'], ['content', 'Import and AI'], ['quality', 'Quality'], ['coverage', 'Coverage'], ['tricks', 'Tricks'], ['reports', 'Student reports']] },
   { id: 'insights', label: 'Insights', icon: '📊', tabs: [['analytics', 'Analytics'], ['ask', 'Ask your data'], ['integrity', 'Integrity']] },
-  { id: 'comms', label: 'Messages', icon: '📣', tabs: [['support', 'Support inbox'], ['messages', 'Send a message'], ['announcements', 'Announcements'], ['notifications', 'Reminder rules']] },
+  { id: 'comms', label: 'Messages', icon: '📣', tabs: [['support', 'Support inbox'], ['desk', 'Doubt desk'], ['messages', 'Send a message'], ['announcements', 'Announcements'], ['notifications', 'Reminder rules']] },
   { id: 'server', label: 'Server', icon: '🖥', tabs: [['alerts', 'Alerts'], ['monitor', 'Monitoring'], ['tools', 'Server tools'], ['control', 'Control room'], ['security', 'Security'], ['integrations', 'Integrations'], ['data', 'Data and backup']] },
   { id: 'help', label: 'Help', icon: '💬', tabs: [['help', 'Help']] },
   { id: 'settings', label: 'Settings', icon: '⚙', tabs: [['settings', 'Site configuration'], ['administrators', 'Administrators'], ['audit', 'Audit log']] },
@@ -153,6 +156,9 @@ export default function AdminApp() {
             <Route path="batches/:id" element={<BatchDetail />} />
             <Route path="announcements" element={<Announcements />} />
             <Route path="notifications" element={<Notifications />} />
+            <Route path="batch-health" element={<BatchHealth />} />
+            <Route path="desk" element={<Desk />} />
+            <Route path="certificates" element={<Certs />} />
             <Route path="referrals" element={<Referrals />} />
             <Route path="settings" element={<Settings />} />
             <Route path="*" element={<Navigate to="/admin" replace />} />

@@ -21,6 +21,7 @@ const LiveBoard = lazy(() => import('./pages/LiveBoard.jsx'));
 const Inbox = lazy(() => import('./pages/Inbox.jsx'));
 const Support = lazy(() => import('./pages/Support.jsx'));
 const Progress = lazy(() => import('./pages/Progress.jsx'));
+const Certificate = lazy(() => import('./pages/Certificate.jsx'));
 const FixLog = lazy(() => import('./pages/FixLog.jsx'));
 const Notebook = lazy(() => import('./pages/Notebook.jsx'));
 const Toolkit = lazy(() => import('./pages/Toolkit.jsx'));
@@ -79,6 +80,7 @@ export default function App() {
           <Route path="/login" element={<AuthPage mode="login" />} />
           <Route path="/register" element={<AuthPage mode="register" />} />
           <Route path="/p/:token" element={<Progress />} />
+          <Route path="/c/:code" element={<Certificate />} />
           <Route element={<Guard />}>
             <Route path="/exam/:attemptId" element={<ExamPage />} />
             <Route path="/admin/*" element={<AdminApp />} />

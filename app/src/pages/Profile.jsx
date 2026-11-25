@@ -6,6 +6,7 @@ import { useTheme, savedChoice } from '../lib/theme.js';
 import { ActivityMap } from '../components/Insights.jsx';
 import { InviteCard, NotificationPrefs, MyBatches, ShareLinks } from '../components/ProfileExtras.jsx';
 import { useSite } from '../lib/site.js';
+import Certificates from '../components/Certificates.jsx';
 
 const dayKey = (d) => { const x = new Date(d); return `${x.getFullYear()}-${x.getMonth()}-${x.getDate()}`; };
 const initials = (n) => (n || '?').trim().split(/\s+/).slice(0, 2).map((w) => w[0]?.toUpperCase()).join('') || '?';
@@ -139,6 +140,7 @@ export default function Profile() {
           {cleared && <p className="okmsg" role="status">Cleared from this device.</p>}
         </section>
 
+        <Certificates />
         <InviteCard />
         <NotificationPrefs />
         <ShareLinks />

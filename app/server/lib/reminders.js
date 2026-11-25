@@ -4,12 +4,12 @@ const DAY = 86400000; const HOUR = 3600000;
 let TZ = '';
 /** The clock used for quiet hours, digests and "tomorrow at 10:00". Set from Admin > Settings. */
 export const setTimezone = (z) => { TZ = z || ''; };
-const tzOf = () => TZ || process.env.MOCKDESK_TZ || 'Asia/Kolkata';
+export const tzOf = () => TZ || process.env.MOCKDESK_TZ || 'Asia/Kolkata';
 export const reminderConfig = (settings) => { const s = settings.get('reminders', {}); const d = DEFAULTS.reminders; return { ...d, ...s, inactive: { ...d.inactive, ...s.inactive }, welcome: { ...d.welcome, ...s.welcome }, mockSoon: { ...d.mockSoon, ...s.mockSoon }, liveClosing: { ...d.liveClosing, ...s.liveClosing }, unfinished: { ...d.unfinished, ...s.unfinished }, streak: { ...d.streak, ...s.streak }, digest: { ...d.digest, ...s.digest }, events: { ...d.events, ...s.events }, channels: { ...d.channels, ...s.channels } }; };
 export const localHour = (t) => Number(new Intl.DateTimeFormat('en-GB', { timeZone: tzOf(), hour: '2-digit', hour12: false }).format(t)) % 24;
 export const dayKey = (t) => new Intl.DateTimeFormat('en-CA', { timeZone: tzOf() }).format(t);
-const clock = (t) => new Intl.DateTimeFormat('en-IN', { timeZone: tzOf(), hour: 'numeric', minute: '2-digit', hour12: true }).format(t).replace(/\s/g, ' ').toUpperCase();
-const dateLabel = (t, now) => { const a = dayKey(t); if (a === dayKey(now)) return 'today'; if (a === dayKey(now + DAY)) return 'tomorrow'; return `on ${new Intl.DateTimeFormat('en-IN', { timeZone: tzOf(), day: 'numeric', month: 'short' }).format(t)}`; };
+export const clock = (t) => new Intl.DateTimeFormat('en-IN', { timeZone: tzOf(), hour: 'numeric', minute: '2-digit', hour12: true }).format(t).replace(/\s/g, ' ').toUpperCase();
+export const dateLabel = (t, now) => { const a = dayKey(t); if (a === dayKey(now)) return 'today'; if (a === dayKey(now + DAY)) return 'tomorrow'; return `on ${new Intl.DateTimeFormat('en-IN', { timeZone: tzOf(), day: 'numeric', month: 'short' }).format(t)}`; };
 export const isQuiet = (cfg, t) => { const h = localHour(t); return cfg.quietFrom > cfg.quietTo ? h >= cfg.quietFrom || h < cfg.quietTo : h >= cfg.quietFrom && h < cfg.quietTo; };
 
 export const localWeekday = (t) => ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].indexOf(new Intl.DateTimeFormat('en-US', { timeZone: tzOf(), weekday: 'short' }).format(t));

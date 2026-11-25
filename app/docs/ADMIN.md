@@ -199,3 +199,9 @@ All of these are in the admin console. Open **Server** for the tools, **Tests > 
 
 ## v23: Motion
 Loading uses a top progress line, a self-drawing tick and skeleton screens; numbers count up; toasts show a timer bar. All motion is disabled when the device asks for reduced motion. Code: `src/components/Motion.jsx`, `src/lib/motion.js`, section "v23 motion system" in `src/styles/global.css`.
+
+## v24: Batch health, Doubt desk, mock reminders, certificates
+- **Batch health** (*Students > Batch health*). Levels: Needs attention (4+ points), Keep an eye (2-3). Points: scores down 8+ points (3), not seen 7+ days (3, or 4 at 14+), no mock after 3 days in the batch (2), overdue mock assignments (1 each, up to 3), recent average under 35% (2). Staff need the Students permission to view and Messages to nudge.
+- **Doubt desk** (*Messages > Doubt desk*). Needs the Support permission. Sharing an answer shows it under that question on other students' review pages.
+- **Scheduled mocks** (*Messages > Reminder rules*). Reminders respect quiet hours and each student's notification settings, and run with the other automatic reminders.
+- **Certificates** (*Students > Certificates*). Rules: mocks for Completion (default 5), percent for Merit (default 80). A withdrawn certificate is never re-issued; restore it instead. Public check page: `/c/CODE`.

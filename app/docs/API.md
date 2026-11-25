@@ -147,3 +147,9 @@ Load test additions: `GET /admin/loadtest/report/:id`, `PUT /admin/loadtest/repo
 ### v22
 - `GET /admin/administrators` (people, invites, rules, presets, counts), `POST /admin/administrators/invite {contact, role, perms|preset}`, `DELETE /admin/administrators/invites/:id`, `PUT /admin/administrators/:id {role, perms, preset, name}`, `DELETE /admin/administrators/:id`, `PUT /admin/administrators-config`, `POST /admin/administrators-lock-inactive`.
 - `GET /admin/help/checks` (tone-coded quick checks), `GET /admin/help/pages?q` (page finder).
+
+### v24
+- Teacher: `GET /teacher/batch-health`, `POST /teacher/batch-health/nudge {batchId, userIds, message?}`, `GET /teacher/desk?status=open|answered|closed|all`, `POST /teacher/desk/:id/answer {answer, share}`, `POST /teacher/desk/:id/close`.
+- Admin: the same under `/admin/batch-health` and `/admin/desk`, plus `GET /admin/certificates?q&page`, `PUT /admin/certificates-config`, `POST /admin/certificates/issue {contact, title, detail}`, `POST /admin/certificates/:code/revoke {undo}`, `GET|PUT /admin/mock-reminders`.
+- Student: `GET /attempts/:id/desk`, `POST /attempts/:id/desk {questionId, text}`, `GET /my/certificates` (issues anything newly earned).
+- Public: `GET /public/certificate/:code` (name, title, date, valid; no contact details).

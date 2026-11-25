@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api } from '../lib/api.js';
+import MockReminders from './MockReminders.jsx';
 import { Badge, Err, Loading, PageHead, Stat, dt, toast, useLoad } from './ui.jsx';
 
 const hr = (h) => `${String(h).padStart(2, '0')}:00`;
@@ -85,6 +86,7 @@ export default function Notifications() {
       <section className="card" style={{ marginTop: 14 }}><h3>Recent failures</h3>
         {!data.failures.length ? <p className="muted small">No failed sends.</p> : <div className="tbl-wrap"><table className="dtable"><thead><tr><th>When</th><th>Student</th><th>Channel</th><th>Reason</th></tr></thead><tbody>{data.failures.map((x, i) => <tr key={i}><td>{dt(x.at)}</td><td>{x.name || '–'}</td><td>{x.channel}</td><td>{x.error}</td></tr>)}</tbody></table></div>}
       </section>
+      <MockReminders />
     </>
   );
 }

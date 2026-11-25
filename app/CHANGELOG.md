@@ -1,5 +1,11 @@
 # What's new in MockDesk
 
+## v24: Batch health, Doubt desk, mock reminders and certificates
+**Batch health (Students > Batch health; teachers: Health).** Every student in a batch is ranked Needs attention, Keep an eye or On track from score drops, days since last seen, overdue assignments, very low averages and "never started". Tick students and Nudge them in one click: a fitting default message per student, or your own. One nudge per student per day.
+**Doubt desk (students: Ask a teacher on the review page; teachers: Doubts; admins: Messages > Doubt desk).** Teachers see the question, the right answer and what the student chose, then reply. Tick "show to others" and the answer appears under that question for everyone who reviews it. Students are notified; limits are 5 waiting and 10 a day.
+**Scheduled mock reminders (Messages > Reminder rules > Scheduled mocks).** Mocks with an opening time remind students who have not taken them, 1 day and 1 hour before. Live tests nudge students who have not started a few minutes after opening. Each reminder can be switched off, and the page shows what was sent.
+**Certificates (Students > Certificates; students: Profile).** Completion (finish N different mocks) and Merit (score at least X% in a mock) are issued automatically. Each has a code and a public page (/c/CODE) that proves it is genuine, with Print or save as PDF, Download image and WhatsApp sharing. Admins set the rules, the name and signer, give special certificates by hand, and withdraw or restore any certificate.
+
 ## v23: Motion pass
 **Loading.** A thin glowing progress line at the top follows real requests and page changes. The logo tick draws itself while the app boots or a page loads. Admin pages show a skeleton (stat tiles and a table shimmering) instead of the word "Loading", and only after 150 ms so quick loads never flash. Other "Loading…" lines get bouncing dots.
 **Feel.** Admin pages ease in on every route change, cards rise in one after another, and table rows slide in. Stat numbers count up. Buttons press down and spring back, stat cards lift on hover, dialogs pop with a spring. Toasts slide in with a tick that pops and a timer bar that shrinks.

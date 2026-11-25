@@ -23,6 +23,7 @@ import { makeAssignments } from './assignments.js';
 import { makeTips, mountTipsStudent, mountTipsTeacher } from './tips.js';
 import { makeSettings } from './lib/settings.js';
 import { mountShare, mountSharePublic } from './share.js';
+import { makeV24 } from './v24.js';
 import { makeDrafter } from './lib/drafter.js';
 import { makeLiveEnv, makeCredentials, lazy } from './lib/credentials.js';
 import { makeMailer, makePusher, makeWhatsApp, createNotifier } from './lib/notify.js';
@@ -118,8 +119,9 @@ export function createApp(db, { allowIncomplete = process.env.MOCKDESK_ALLOW_INC
   const assign = makeAssignments({ db, now, notifier, readResult });
   const tips = makeTips({ db, now, settings, readResult, notifier, controls, getMock });
   const features2 = makeFeatures2({ db, now, iso, notifier, readResult, dropCaches: () => { snaps.clear(); features.clearBoards(); cache.clear(); } });
+  const v24 = makeV24({ db, now, notifier, settings, readResult });
   app.exams = exams;
-  const extras = [digestRunner({ db, notifier }), liveResultsRunner({ db, notifier, board: features.board })];
+  const extras = [digestRunner({ db, notifier }), liveResultsRunner({ db, notifier, board: features.board }), v24.mockRunner];
   const runRem = (opts = {}) => runReminders({ db, notifier, settings, now, extras, ...opts });
   app.runReminders = runRem;
   app.notifier = notifier; app.db = db; app.settingsStore = settings;
@@ -257,7 +259,7 @@ export function createApp(db, { allowIncomplete = process.env.MOCKDESK_ALLOW_INC
 
   // Public: what the landing page shows to visitors who have not signed in. Nothing personal; cached for a minute.
   let pubCache = { at: 0, body: null };
-  mountSharePublic(api, { db, now });
+  mountSharePublic(api, { db, now }); v24.mountPublic(api);
   setTimezone(limitsOf(settings).timezone);
   api.get('/public/site', (req, res) => { const s = siteOf(settings); res.setHeader('Cache-Control', 'public, max-age=60'); res.json({ name: s.name, tagline: s.tagline, heroTitle: s.heroTitle, heroText: s.heroText, supportEmail: s.supportEmail, supportPhone: s.supportPhone, disclaimer: s.disclaimer, faq: s.faq, logoUrl: s.logoUrl, accent: s.accent, footerText: s.footerText, minPassword: limitsOf(settings).minPassword, maintenance: controls().maintenance.mode, maintenanceMessage: controls().maintenance.message, signupsOpen: controls().signups.open, signupDomains: controls().signups.domains, features: controls().features }); });
   api.get('/public/overview', (req, res) => {
@@ -413,7 +415,7 @@ export function createApp(db, { allowIncomplete = process.env.MOCKDESK_ALLOW_INC
 
   // Admin accounts are separate from student accounts: they only use /api/admin.
   api.use(['/mocks', '/attempts', '/stats', '/questions', '/practice', '/notebook', '/bookmarks', '/referral', '/batches', '/my', '/inbox', '/push', '/announcements', '/notifications', '/errors', '/fixes', '/share-links', '/support'], (req, res, next) => (['admin', 'editor', 'teacher'].includes(req.user?.role) ? res.status(403).json({ error: 'This account uses its own console, not the student area', code: 'ADMIN_ONLY' }) : next()));
-  features.mount(api); mountSupportStudent({ api, db, now, notifier }); mountShare(api, { db, now }); features.mountTeacher(api); assign.mountTeacher(api); assign.mountStudent(api); mountTipsStudent(api, tips, { db, now, notifier }); mountTipsTeacher(api, tips, { db, getMock, publishedMocks: () => db.prepare("SELECT id, name FROM mocks WHERE status='published' AND id NOT IN ('practice','pool') ORDER BY number, created_at").all() }); features2.mount(api); features2.mountTeacher(api);
+  features.mount(api); mountSupportStudent({ api, db, now, notifier }); mountShare(api, { db, now }); features.mountTeacher(api); assign.mountTeacher(api); assign.mountStudent(api); mountTipsStudent(api, tips, { db, now, notifier }); mountTipsTeacher(api, tips, { db, getMock, publishedMocks: () => db.prepare("SELECT id, name FROM mocks WHERE status='published' AND id NOT IN ('practice','pool') ORDER BY number, created_at").all() }); features2.mount(api); features2.mountTeacher(api); v24.mountStudent(api); v24.mountTeacher(api);
   api.get('/mocks', (req, res) => {
     const rows = db.prepare('SELECT * FROM attempts WHERE user_id=? ORDER BY started_at DESC').all(req.user.id);
     for (const r of rows) if (r.status === 'in_progress' && mockOf(r)) expire(r);
@@ -656,7 +658,7 @@ export function createApp(db, { allowIncomplete = process.env.MOCKDESK_ALLOW_INC
   jobs.reg('backup', 'Database backup', 'every 10 min (runs when due)', () => { const b = runBackup({ db, now, settings }); return b ? `Saved ${b.name}` : 'Not due yet'; });
   jobs.reg('assignments', 'Assignment reminders', 'every 10 min', async () => `Sent ${await assign.run()} reminder(s)`);
   jobs.reg('cleanup', 'Tidy expired sign-ins and codes', 'every 10 min', () => { const t = now(); db.prepare('DELETE FROM sessions WHERE expires_at<?').run(t); db.prepare("DELETE FROM otps WHERE expires_at<? AND expires_at>0").run(t - 86400000); db.prepare('DELETE FROM login_log WHERE at<?').run(t - 90 * 86400000); });
-  api.use('/admin', (req, res, next) => (['admin', 'editor'].includes(req.user.role) ? next() : res.status(403).json({ error: 'Admin access only' })), adminRouter({ tips, assign, exitFn, drafter, db, now, invalidate, getMock, readResult, hashPw, iso, settings, notifier, features, features2, exams, runReminders: runRem, mailer, jobs, metrics, controls, creds, live, otpSender, whatsapp }));
+  api.use('/admin', (req, res, next) => (['admin', 'editor'].includes(req.user.role) ? next() : res.status(403).json({ error: 'Admin access only' })), adminRouter({ v24, tips, assign, exitFn, drafter, db, now, invalidate, getMock, readResult, hashPw, iso, settings, notifier, features, features2, exams, runReminders: runRem, mailer, jobs, metrics, controls, creds, live, otpSender, whatsapp }));
 
   api.use((req, res) => res.status(404).json({ error: 'Not found' }));
   app.use('/api', api);

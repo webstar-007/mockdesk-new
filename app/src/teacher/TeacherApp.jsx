@@ -8,6 +8,8 @@ import ThemeToggle from '../components/ThemeToggle.jsx';
 import PageNav, { teacherTrail, useCrumb } from '../components/PageNav.jsx';
 import { AssignmentList, AssignmentDetail } from './Assignments.jsx';
 import Tricks from './Tricks.jsx';
+import HealthBoard from '../components/HealthBoard.jsx';
+import DeskQueue from '../components/DeskQueue.jsx';
 
 const ago = (ms) => { if (!ms) return 'never'; const d = Math.floor((Date.now() - ms) / 86400000); return d < 1 ? 'today' : d === 1 ? 'yesterday' : `${d} days ago`; };
 const useGet = (url) => { const [s, set] = useState({ data: null, err: '' }); useEffect(() => { set({ data: null, err: '' }); api.get(url).then((data) => set({ data, err: '' })).catch((e) => set({ data: null, err: e.message })); }, [url]); return s; };
@@ -171,8 +173,8 @@ export default function TeacherApp() {
   if (user?.role !== 'teacher') return <Navigate to="/" replace />;
   return (
     <div className="tc">
-      <header className="topbar"><div className="topbar-in"><Link to="/teacher" className="brand"><BrandMark /><span>{site.name} <small className="muted">Teacher</small></span></Link><div className="topbar-user"><Link className="btn btn-ghost btn-sm" to="/teacher/assignments">Assignments</Link><Link className="btn btn-ghost btn-sm" to="/teacher/tricks">Tricks</Link><ThemeToggle /><span className="who">{user.name}</span><button className="btn btn-ghost btn-sm" onClick={logout}>Sign out</button></div></div></header>
-      <main className="shell" id="main"><TeacherNav /><Routes><Route index element={<Batches />} /><Route path="assignments" element={<AssignmentList />} /><Route path="tricks" element={<Tricks />} /><Route path="assignments/:id" element={<AssignmentDetail />} /><Route path=":id" element={<Batch />} /><Route path=":id/:uid" element={<Student />} /><Route path="*" element={<Navigate to="/teacher" replace />} /></Routes></main>
+      <header className="topbar"><div className="topbar-in"><Link to="/teacher" className="brand"><BrandMark /><span>{site.name} <small className="muted">Teacher</small></span></Link><div className="topbar-user"><Link className="btn btn-ghost btn-sm" to="/teacher/health">Health</Link><Link className="btn btn-ghost btn-sm" to="/teacher/doubts">Doubts</Link><Link className="btn btn-ghost btn-sm" to="/teacher/assignments">Assignments</Link><Link className="btn btn-ghost btn-sm" to="/teacher/tricks">Tricks</Link><ThemeToggle /><span className="who">{user.name}</span><button className="btn btn-ghost btn-sm" onClick={logout}>Sign out</button></div></div></header>
+      <main className="shell" id="main"><TeacherNav /><Routes><Route index element={<Batches />} /><Route path="assignments" element={<AssignmentList />} /><Route path="tricks" element={<Tricks />} /><Route path="health" element={<div><div className="pagehead"><div><h1>Batch health</h1><p className="muted small">Who is slipping in your batches. Nudge them in one click.</p></div></div><HealthBoard base="/teacher" /></div>} /><Route path="doubts" element={<div><div className="pagehead"><div><h1>Doubts</h1><p className="muted small">Questions your students ask from their review page.</p></div></div><DeskQueue base="/teacher" /></div>} /><Route path="assignments/:id" element={<AssignmentDetail />} /><Route path=":id" element={<Batch />} /><Route path=":id/:uid" element={<Student />} /><Route path="*" element={<Navigate to="/teacher" replace />} /></Routes></main>
     </div>
   );
 }

@@ -9,6 +9,7 @@ import OptionList from '../components/OptionList.jsx';
 import ReportQuestion from '../components/ReportQuestion.jsx';
 import SolutionViewer from '../components/SolutionViewer.jsx';
 import DoubtChat from '../components/DoubtChat.jsx';
+import DeskPanel, { useDesk } from '../components/DeskPanel.jsx';
 import { LABELS, labelAll } from '../lib/attempt.js';
 
 const FILTERS = [['all', 'All'], ['correct', 'Correct'], ['incorrect', 'Incorrect'], ['unattempted', 'Unattempted'], ['marked', 'Marked for review'], ['slow', 'Took long'], ['saved', 'Bookmarked']];
@@ -23,6 +24,7 @@ export default function ReviewPage() {
   const filter = sp.get('filter') || 'all'; const section = sp.get('section') || 'all'; const topic = sp.get('topic') || 'all'; const diff = sp.get('difficulty') || 'all'; const qid = sp.get('qid');
   useEffect(() => { api.get(`/attempts/${attemptId}/result`).then(setD).catch((e) => setErr(e.message)); }, [attemptId]);
   const [tipsD, reloadTips] = useTips(attemptId);
+  const [deskD, reloadDesk] = useDesk(attemptId);
   useEffect(() => { api.get(`/attempts/${attemptId}/errors`).then((r) => { setWhy(r.reasons); setWhyOpts(r.options); }).catch(() => {}); }, [attemptId]);
   const tagWhy = async (qid, reason) => { const next = why[qid] === reason ? '' : reason; setWhy((w) => ({ ...w, [qid]: next })); setWhyErr(''); try { await api.put(`/attempts/${attemptId}/errors/${encodeURIComponent(qid)}`, { reason: next }); } catch (e) { setWhy((w) => ({ ...w, [qid]: why[qid] || '' })); setWhyErr(e.message); } };
   // Bookmarks and notes are kept on your account so the Notebook can show them anywhere.
@@ -103,6 +105,7 @@ export default function ReviewPage() {
             <SolutionViewer q={q} />
             <TrickCorner attemptId={attemptId} q={q} tips={tipsD} reload={reloadTips} />
             {d.doubt && <DoubtChat key={q.id} attemptId={attemptId} q={q} gate={d.doubt} />}
+            <DeskPanel attemptId={attemptId} q={q} desk={deskD} reload={reloadDesk} />
             {bmErr && <div className="alert" role="alert">{bmErr}</div>}
             {saved[q.id] ? <div className="rv-note"><label htmlFor="rv-note">Your note for this question</label><textarea id="rv-note" rows={2} maxLength={500} placeholder="Write the rule, formula or trick you want to remember" value={notes[q.id] || ''} onChange={(e) => setNotes({ ...notes, [q.id]: e.target.value })} onBlur={() => saveNote(q.id)} /></div> : <p className="small muted rv-note-hint">Bookmark this question to add a note and find it later in your <Link to="/notebook">Notebook</Link>.</p>}
             <div className="rv-nav"><button className="btn btn-ghost" disabled={idx === 0} onClick={() => setPos(idx - 1)}>← Previous</button><button className="btn btn-primary" disabled={idx >= list.length - 1} onClick={() => setPos(idx + 1)}>Next →</button></div>
