@@ -7,6 +7,7 @@
 **Live view.** Students active, requests per second, p95 and p99, failures and requests waiting, resource meters, charts with p99 and in-flight, a live feed with milestones, new error types, recoveries and warnings (filter All, Problems, Good), and a failures-by-type list. Setup of large tests shows progress.
 **Big tests.** Users are created in slices, latency samples are capped so memory stays flat, and the preflight now checks generator memory, open-file limit and setup time.
 **Baseline.** Mark any saved result as your baseline. Every later result shows a banner comparing it with the baseline. Reports also download as CSV from the server.
+**Dark mode.** The new setup, live view and report follow the dark theme (cards, switches, chips, sticky bar). Fixed the total showing 0 after picking some scenarios.
 
 ## v27: Full-platform QA sweep
 Checked every admin, teacher, student and sign-in page on desktop, phone and dark mode.

@@ -132,7 +132,7 @@ function Limits({ info, onClose, onSaved }) {
 
 function Setup({ info, d, form, set, setForm, onStart }) {
   const L = info.limits; const real = info.real || { students: 0, batches: [] }; const [adv, setAdv] = useState(false); const [showLimits, setShowLimits] = useState(false); const [pname, setPname] = useState(''); const [busy, setBusy] = useState(false); const [notes, setNotes] = useState(false);
-  const pages = form.pages || []; const custom = form.custom || []; const sub = form.submitAtEnd; const tg = form.targets || {}; const total = form.users + form.browsers;
+  const pages = form.pages || []; const custom = form.custom || []; const sub = form.submitAtEnd; const tg = form.targets || {}; const total = (form.users || 0) + (form.browsers || 0);
   const [pre, setPre] = useState(null); const cfgKey = JSON.stringify({ ...form, note: '', label: '' });
   useEffect(() => { const h = setTimeout(() => { api.post('/admin/loadtest/preflight', form).then(setPre).catch(() => setPre(null)); }, 500); return () => clearTimeout(h); }, [cfgKey]); // eslint-disable-line
   const setTg = (k, v) => set('targets', { ...tg, [k]: v });
@@ -142,7 +142,7 @@ function Setup({ info, d, form, set, setForm, onStart }) {
   const setCustom = (n, patch) => set('custom', custom.map((c, i) => (i === n ? { ...c, ...patch } : c)));
   const flip = (k, onVal) => (on) => set(k, on ? onVal : 0);
   const scen = useMemo(() => {
-    const list = SCENARIOS.map((x) => ({ ...x, cfg: x.max ? { ...x.cfg, users: L.users[1] } : { ...x.cfg, users: Math.min(x.cfg.users, L.users[1]), browsers: x.cfg.browsers ? Math.min(x.cfg.browsers, L.browsers[1]) : undefined }, text: x.max ? `${fmtN(L.users[1])} students, climbing gradually.` : x.text }));
+    const list = SCENARIOS.map((x) => ({ ...x, cfg: x.max ? { ...x.cfg, users: L.users[1] } : { ...x.cfg, users: Math.min(x.cfg.users, L.users[1]), ...(x.cfg.browsers ? { browsers: Math.min(x.cfg.browsers, L.browsers[1]) } : {}) }, text: x.max ? `${fmtN(L.users[1])} students, climbing gradually.` : x.text }));
     if (real.students > 1) list.push({ id: 'real', icon: '🎓', name: 'All my students', text: `${fmtN(real.students)} registered students join at once.`, cfg: { users: Math.min(real.students, L.users[1]), durationSec: 180, pattern: 'spike' } });
     if (real.batches[0]?.n > 1) list.push({ id: 'batch', icon: '👥', name: `Batch: ${real.batches[0].name}`, text: `${fmtN(real.batches[0].n)} students, steady.`, cfg: { users: Math.min(real.batches[0].n, L.users[1]), durationSec: 120, pattern: 'steady' } });
     return list;
