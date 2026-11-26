@@ -6,11 +6,11 @@ import { tip } from '../components/Tip.jsx';
 import Builder from './Builder.jsx';
 
 export default function Mocks() {
-  const nav = useNavigate(); const { data, err, loading } = useLoad('/admin/mocks'); const meta = useLoad('/admin/meta');
+  const nav = useNavigate(); const { data, err, loading } = useLoad('/admin/mocks'); const meta = useLoad('/admin/meta'); const exs = useLoad('/admin/exams');
   const [exFlt, setExFlt] = useState(''); const [dlg, setDlg] = useState(false); const [bld, setBld] = useState(false); const [f, setF] = useState({ name: '', difficulty: 'moderate', description: '', tags: [], cloneFrom: '', examId: '' }); const [e2, setE2] = useState(''); const [busy, setBusy] = useState(false); const [flt, setFlt] = useState('');
   const create = async () => { setBusy(true); setE2(''); try { const r = await api.post('/admin/mocks', { ...f, tags: [...new Set([f.difficulty, ...f.tags])], cloneFrom: f.cloneFrom || undefined, examId: f.cloneFrom ? undefined : f.examId || undefined }); toast('Mock created as a draft'); nav(`/admin/mocks/${r.mock.id}`); } catch (e) { setE2(e.message); setBusy(false); } };
   if (loading && !data) return <Loading />; if (err) return <Err>{err}</Err>;
-  const examsById = Object.fromEntries((meta.data?.exams || []).map((x) => [x.id, x])); const list = data.mocks.filter((m) => (!flt || m.status === flt) && (!exFlt || (m.examId || 'ssc-cgl-t2') === exFlt));
+  const examsById = Object.fromEntries((exs.data?.exams || []).map((x) => [x.id, x])); const list = data.mocks.filter((m) => (!flt || m.status === flt) && (!exFlt || (m.examId || 'ssc-cgl-t2') === exFlt));
   return (
     <>
       <PageHead title="Mocks" sub="Build, tag and publish mock tests. Students only see published mocks."><button className="btn btn-ghost" onClick={() => setBld(true)}>⚡ Build from bank</button><button className="btn btn-primary" onClick={() => setDlg(true)}>＋ New mock</button></PageHead>

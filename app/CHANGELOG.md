@@ -1,5 +1,9 @@
 # What's new in MockDesk
 
+## v27: Full-platform QA sweep
+Checked every admin, teacher, student and sign-in page on desktop, phone and dark mode.
+**Fixed.** Mock cards showed blank section bars ("0/"); the Audit log's When column wrapped into six lines and long details ran off the table; the Server tools checks list put each dot on its own line; the Support inbox filter chips were clipped ("Al"); form fields with hints sat out of line with their neighbours (batch invite, Topper tricks); the Exams page repeated the same "edit config" line twice; teacher Doubts and Batch health pages had the wrong breadcrumb ("Batch"); the admin search box showed a garbled letter on phones; Help was indented differently from other admin pages; the Administrators filter row wrapped awkwardly.
+
 ## v26: Help redesign and data answers
 **Clean Help.** One search box with type-ahead, quick-check pills, and four idea tabs (People, Mocks and results, Platform, How do I…). Answers appear as a simple question-and-answer thread; the busy side panels are gone and "Browse all topics" is one click away at the bottom.
 **Ask for data.** Help now reads live data in plain words: profiles for any student, teacher, editor or admin (scores, trend, batches, tickets, recent activity); top and lowest students, inactive or never-started students, new sign-ups, who is online; teachers, staff and admins; batches and batches without a teacher; the hardest or most attempted mock; tests finished today or this week; open tickets and reports; doubts; certificates; failed sign-ins; what admins did recently; a platform overview. How-to questions still get the step-by-step guide. Test accounts are never counted.
