@@ -110,5 +110,5 @@ test('help: quick checks and page finder endpoints', async () => {
   const p = (await call('boss', 'GET', '/admin/help/pages?q=administr')).body.pages;
   assert.ok(p.some((x) => x.to === '/admin/administrators'));
   const a = (await call('boss', 'POST', '/admin/help/ask', { q: 'how many admins do I have' })).body;
-  assert.ok(a.live && a.live.title === 'Admins and staff');
+  assert.ok(a.data && a.data.stats[0].label === 'Admins' && a.data.stats[0].value >= 1);
 });

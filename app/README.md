@@ -9,6 +9,7 @@ It is one Node.js program with a built-in SQLite database. No separate database 
 - **Students:** timed mocks with sectional timers and +3 / −1 marking, live-window mocks, practice sets, mistake notebook, bookmarks, PDF reports, share card, reminders, weekly summary, and a read-only progress link for a parent or mentor.
 - **Admins** (`/admin`): users, attempts, mocks, question editor and bank, bulk import from Word or CSV, duplicate finder, AI solution drafts, announcements, messages (in-app, push, email, WhatsApp), copy check, bulk student import, CSV exports, backups, staff permissions, and Settings for the site name, contact, home page text, limits and time zone.
 - **Help, trick corner, stamina curve, load simulator (v21):** an in-dashboard help assistant, student shortcuts with upvotes and teacher verification, a stamina and panic-streak analysis on results, and a safe load test for the live server.
+- **Help redesign (v26):** a clean single search box that answers data questions about students, teachers, editors, mocks and activity, with sortable, exportable tables.
 - **Load test rework (v25):** pass/fail targets, warm-up, staircase and wave patterns, preflight checks, custom write requests and a sign-in speed check.
 - **Batch health, Doubt desk, certificates and mock reminders (v24).**
 - **Administrators (v22):** invite or remove admins and staff, presets, rules, idle-staff lock, activity. Earlier (v20): team activity and branding.

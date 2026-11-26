@@ -208,3 +208,6 @@ Loading uses a top progress line, a self-drawing tick and skeleton screens; numb
 
 ## v25: Load test rework
 Setup now has a live preflight (blockers stop Start, warnings are advice), pass/fail Targets, a warm-up period excluded from results, Staircase and Waves arrival patterns, section-move, tab-switch and home-page actions, custom requests with GET/POST/PUT and bodies (`{attempt}`, `{question}`; only safe write paths are allowed), up to 1000 students and 15 minutes, and a Sign-in speed check card. Reports show Targets, per-step results and a trend across saved tests.
+
+## v26: Help
+Help is one search box. Ask about people (by name or email), lists (top, lowest, inactive, new, online), teachers and batches, mocks, tests finished in a period, tickets, reports, sign-ins and admin activity. Tables sort, filter, copy and export to CSV. Questions starting with how/where/what is go to the step-by-step guides.

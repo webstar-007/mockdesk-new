@@ -145,7 +145,7 @@ test('help: answers plain questions, fixes typos, shows live facts, logs gaps, t
   assert.equal((await ask('boss', 'bakcup the databse')).card.id, 'backup');
   assert.equal((await ask('boss', 'how do i lock a teacher account')).card.id, 'team-lock');
   assert.equal((await ask('boss', 'how to change logo and colour')).card.id, 'branding');
-  const lv = await ask('boss', 'how many students do I have?'); assert.equal(lv.live.title, 'Students right now'); assert.ok(lv.live.lines.some((l) => l.label === 'Students' && l.value >= 10));
+  const lv = await ask('boss', 'how many students do I have?'); assert.equal(lv.data.title, 'Students right now'); assert.ok(lv.data.stats.some((l) => l.label === 'Students' && l.value >= 10));
   assert.match((await ask('boss', 'is the server ok?')).live.title, /status/i);
   assert.equal((await ask('boss', 'how much disk space is left')).live.title, 'Disk space');
   assert.equal((await ask('boss', 'hi')).kind, 'chat');

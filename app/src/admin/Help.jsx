@@ -1,140 +1,228 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { api } from '../lib/api.js';
-import { Badge, Empty, PageHead, ago, toast } from './ui.jsx';
+import { Empty, PageHead, ago, toast } from './ui.jsx';
 
-const KEY = 'md-help-chat';
+const KEY = 'md-help-thread';
 const load = () => { try { return JSON.parse(sessionStorage.getItem(KEY)) || []; } catch { return []; } };
-const save = (m) => { try { sessionStorage.setItem(KEY, JSON.stringify(m.slice(-30))); } catch { /* private mode */ } };
+const save = (m) => { try { sessionStorage.setItem(KEY, JSON.stringify(m.slice(-20))); } catch { /* private mode */ } };
 let seq = 0; const nid = () => `${Date.now()}-${seq++}`;
 
-function Steps({ steps, id }) {
-  const [done, setDone] = useState({});
-  return (
-    <ol className="hp-steps">{steps.map((s, i) => (
-      <li key={i} className={done[i] ? 'done' : ''}><label><input type="checkbox" checked={!!done[i]} onChange={() => setDone((d) => ({ ...d, [i]: !d[i] }))} aria-label={`Step ${i + 1} done`} /><span>{s}</span></label></li>))}
-    </ol>
-  );
-}
+const IDEAS = {
+  People: ['Show top 10 students', 'Which students have not logged in for 14 days', 'Students who never started a test', 'Show all teachers', 'How many admins do I have'],
+  'Mocks and results': ['Which mock is the hardest', 'Which mock is attempted the most', 'How many tests were finished this week', 'Which tests are in progress now'],
+  Platform: ['Platform overview', 'Which batches have no teacher', 'Show open support tickets', 'What did admins do recently', 'Failed sign-ins today'],
+  'How do I…': ['How do I add a teacher?', 'How do I back up the data?', 'How do I put the site in maintenance mode?', 'How many students can my server handle?'],
+};
 
-function Feedback({ logId }) {
-  const [state, setState] = useState(''); const [note, setNote] = useState('');
-  const send = async (helpful, n = '') => { try { await api.post('/admin/help/feedback', { logId, helpful, note: n }); setState(helpful ? 'yes' : 'sent'); } catch { /* feedback is optional */ } };
-  if (state === 'yes') return <p className="small muted hp-fb">Thanks, glad it helped.</p>;
-  if (state === 'sent') return <p className="small muted hp-fb">Thanks. This will help improve the answers.</p>;
-  if (state === 'no') return <form className="hp-fb hp-fb-note" onSubmit={(e) => { e.preventDefault(); send(false, note); }}><input aria-label="What were you looking for?" placeholder="What were you looking for?" value={note} onChange={(e) => setNote(e.target.value)} maxLength={300} /><button className="btn btn-ghost btn-sm">Send</button></form>;
-  return <div className="hp-fb small muted">Was this helpful? <button className="hp-thumb" onClick={() => send(true)} aria-label="Yes, helpful">👍</button><button className="hp-thumb" onClick={() => { setState('no'); send(false); }} aria-label="No, not helpful">👎</button></div>;
-}
+const toCsv = (t) => [t.cols, ...t.rows.map((r) => r.cells)].map((r) => r.map((c) => `"${String(c ?? '').replace(/"/g, '""')}"`).join(',')).join('\n');
+const num = (v) => { const n = parseFloat(String(v).replace(/[^0-9.-]/g, '')); return Number.isFinite(n) && /\d/.test(String(v)) && !/[a-z]{3,}/i.test(String(v)) ? n : null; };
 
-function Answer({ m, onAsk, onOpen, onRefresh }) {
-  const c = m.card; const lv = m.live;
-  const copy = async () => { try { await navigator.clipboard.writeText(`${c.title}\n${c.answer}${c.steps.length ? `\n${c.steps.map((s, i) => `${i + 1}. ${s}`).join('\n')}` : ''}`); toast('Copied'); } catch { toast('Could not copy', 'bad'); } };
+function Table({ t }) {
+  const [sort, setSort] = useState({ i: -1, dir: 1 }); const [f, setF] = useState('');
+  const rows = useMemo(() => {
+    let r = t.rows; if (f.trim()) r = r.filter((x) => x.cells.join(' ').toLowerCase().includes(f.trim().toLowerCase()));
+    if (sort.i >= 0) r = [...r].sort((a, b) => { const x = a.cells[sort.i], y = b.cells[sort.i]; const nx = num(x), ny = num(y); const c = nx != null && ny != null ? nx - ny : String(x).localeCompare(String(y)); return c * sort.dir; });
+    return r;
+  }, [t, sort, f]);
+  const nav = useNavigate();
+  const toggle = (i) => setSort((s) => (s.i === i ? { i, dir: -s.dir } : { i, dir: 1 }));
   return (
-    <div className="hp-msg bot">
-      {m.say && <p>{m.say}</p>}
-      {m.fixed && c && <p className="small muted">Showing results for what I think you meant.</p>}
-      {lv && (
-        <section className="hp-live" aria-label={lv.title}>
-          <header><b>{lv.title}</b><span className="small muted">live</span><button className="btn btn-ghost btn-sm" onClick={() => onRefresh(m.q)}>Refresh</button></header>
-          <dl>{lv.lines.map((x) => <div key={x.label}><dt>{x.label}</dt><dd>{String(x.value)}</dd></div>)}</dl>
-          {lv.go.length > 0 && <p className="hp-go">{lv.go.map((g) => <Link key={g.to} className="btn btn-ghost btn-sm" to={g.to}>{g.label}</Link>)}</p>}
-        </section>
-      )}
-      {c && (
-        <article className="hp-card">
-          <header><Badge>{c.area}</Badge><button className="hp-copy" onClick={copy} aria-label="Copy this answer">Copy</button></header>
-          <h3>{c.title}</h3>
-          <p>{c.answer}</p>
-          {c.steps.length > 0 && <><h4>Steps</h4><Steps steps={c.steps} id={c.id} /></>}
-          {c.go.length > 0 && <p className="hp-go">{c.go.map((g) => <Link key={g.to + g.label} className="btn btn-primary btn-sm" to={g.to}>{g.label}</Link>)}</p>}
-          {c.related.length > 0 && <div className="hp-rel"><span className="small muted">Related</span>{c.related.map((x) => <button key={x.id} className="chip" onClick={() => onOpen(x.id)}>{x.title}</button>)}</div>}
-          {m.logId && <Feedback logId={m.logId} />}
-        </article>
-      )}
-      {!c && m.alternatives?.length > 0 && <div className="hp-alts">{m.alternatives.map((x) => <button key={x.title} className="chip" onClick={() => (x.ask ? onAsk(x.title) : onOpen(x.id))}>{x.title}</button>)}</div>}
-      {c && m.alternatives?.length > 0 && <div className="hp-alts"><span className="small muted">Others people ask</span>{m.alternatives.map((x) => <button key={x.id} className="chip" onClick={() => onOpen(x.id)}>{x.title}</button>)}</div>}
-      {m.kind === 'none' && m.logId && <Feedback logId={m.logId} />}
+    <div className="hx-table">
+      {t.rows.length > 8 && <input className="hx-filter" value={f} onChange={(e) => setF(e.target.value)} placeholder="Filter these rows" aria-label="Filter rows" />}
+      <div className="hx-scroll"><table>
+        <thead><tr>{t.cols.map((c, i) => <th key={c + i} aria-sort={sort.i === i ? (sort.dir > 0 ? 'ascending' : 'descending') : 'none'}><button onClick={() => toggle(i)}>{c}{sort.i === i ? (sort.dir > 0 ? ' ↑' : ' ↓') : ''}</button></th>)}</tr></thead>
+        <tbody>{rows.map((r, k) => (
+          <tr key={k} className={r.to ? 'go' : ''} onClick={r.to ? () => nav(r.to) : undefined}>{r.cells.map((c, i) => <td key={i}>{i === 0 && r.to ? <Link to={r.to} onClick={(e) => e.stopPropagation()}>{String(c)}</Link> : String(c)}</td>)}</tr>))}
+        </tbody>
+      </table></div>
+      {!rows.length && <p className="hx-none">No rows match “{f}”.</p>}
     </div>
   );
 }
 
-function Gaps() {
+function Stats({ list }) {
+  return <dl className="hx-stats">{list.map((s) => <div key={s.label} className={s.tone ? `t-${s.tone}` : ''}><dt>{s.label}</dt><dd>{String(s.value)}</dd></div>)}</dl>;
+}
+
+function Actions({ d, onRefresh, copyText }) {
+  const copy = async () => { try { await navigator.clipboard.writeText(copyText); toast('Copied'); } catch { toast('Could not copy', 'bad'); } };
+  const csv = () => { const b = new Blob([toCsv(d.table)], { type: 'text/csv' }); const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = `${(d.title || 'help').toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 40)}.csv`; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000); };
+  return (
+    <div className="hx-acts">
+      {onRefresh && <button onClick={onRefresh} title="Re-run with the latest data">Refresh</button>}
+      <button onClick={copy}>Copy</button>
+      {d?.table && <button onClick={csv}>Download CSV</button>}
+    </div>
+  );
+}
+
+function DataCard({ d, onAsk, onRefresh }) {
+  const text = [d.title, d.summary, ...(d.stats || []).map((s) => `${s.label}: ${s.value}`), ...(d.table ? [d.table.cols.join('\t'), ...d.table.rows.map((r) => r.cells.join('\t'))] : [])].filter(Boolean).join('\n');
+  return (
+    <article className="hx-card">
+      <header><h3>{d.title}</h3><Actions d={d} onRefresh={onRefresh} copyText={text} /></header>
+      {d.summary && <p className="hx-sum">{d.summary}</p>}
+      {d.stats?.length > 0 && <Stats list={d.stats} />}
+      {d.table && <Table t={d.table} />}
+      {d.empty && <p className="hx-none">{d.empty}</p>}
+      {(d.go?.length > 0 || d.follow?.length > 0) && (
+        <footer>
+          {d.go?.map((g) => <Link key={g.to} className="hx-open" to={g.to}>{g.label}</Link>)}
+          {d.follow?.map((f) => <button key={f} className="hx-chip" onClick={() => onAsk(f)}>{f}</button>)}
+        </footer>)}
+    </article>
+  );
+}
+
+function Feedback({ logId }) {
+  const [state, setState] = useState('');
+  const send = async (helpful) => { try { await api.post('/admin/help/feedback', { logId, helpful }); setState(helpful ? 'yes' : 'no'); } catch { /* optional */ } };
+  if (state) return <span className="hx-fb">{state === 'yes' ? 'Thanks.' : 'Noted. This will help improve the answers.'}</span>;
+  return <span className="hx-fb">Helpful? <button onClick={() => send(true)} aria-label="Yes">👍</button><button onClick={() => send(false)} aria-label="No">👎</button></span>;
+}
+
+function Guide({ c, logId, onOpen }) {
+  const [done, setDone] = useState({}); const [open, setOpen] = useState(true);
+  return (
+    <article className="hx-card hx-guide">
+      <header><div><span className="hx-tag">{c.area}</span><h3>{c.title}</h3></div></header>
+      <p>{c.answer}</p>
+      {c.steps.length > 0 && (
+        <details open={open} onToggle={(e) => setOpen(e.currentTarget.open)}>
+          <summary>{c.steps.length} steps</summary>
+          <ol>{c.steps.map((s, i) => <li key={i} className={done[i] ? 'done' : ''}><label><input type="checkbox" checked={!!done[i]} onChange={() => setDone((d) => ({ ...d, [i]: !d[i] }))} /><span>{s}</span></label></li>)}</ol>
+        </details>)}
+      <footer>
+        {c.go.map((g) => <Link key={g.to + g.label} className="hx-open primary" to={g.to}>{g.label}</Link>)}
+        {c.related.slice(0, 3).map((x) => <button key={x.id} className="hx-chip" onClick={() => onOpen(x.id)}>{x.title}</button>)}
+        {logId && <Feedback logId={logId} />}
+      </footer>
+    </article>
+  );
+}
+
+function Live({ lv, onRefresh }) {
+  return (
+    <article className="hx-card">
+      <header><h3>{lv.title}</h3><Actions d={lv} onRefresh={onRefresh} copyText={`${lv.title}\n${lv.lines.map((x) => `${x.label}: ${x.value}`).join('\n')}`} /></header>
+      <Stats list={lv.lines} />
+      {lv.go?.length > 0 && <footer>{lv.go.map((g) => <Link key={g.to} className="hx-open" to={g.to}>{g.label}</Link>)}</footer>}
+    </article>
+  );
+}
+
+function Answer({ e, onAsk, onOpen, onRefresh }) {
+  const r = e.res;
+  if (!r) return <div className="hx-typing" role="status" aria-label="Looking for an answer"><i /><i /><i /></div>;
+  if (r.error) return <p className="hx-err">{r.error}</p>;
+  return (
+    <div className="hx-ans">
+      {r.say && <p className="hx-say">{r.say}</p>}
+      {r.fixed && r.card && <p className="hx-note">Showing results for what I think you meant.</p>}
+      {r.data && <DataCard d={r.data} onAsk={onAsk} onRefresh={() => onRefresh(e)} />}
+      {r.live && <Live lv={r.live} onRefresh={() => onRefresh(e)} />}
+      {r.card && !r.data && <Guide c={r.card} logId={r.logId} onOpen={onOpen} />}
+      {r.alternatives?.length > 0 && <div className="hx-alts">{r.data || r.card ? <span>Guides on this</span> : null}{r.alternatives.map((x) => <button key={x.title} className="hx-chip" onClick={() => (x.ask ? onAsk(x.title) : onOpen(x.id))}>{x.title}</button>)}</div>}
+      {r.kind === 'none' && r.logId && <Feedback logId={r.logId} />}
+    </div>
+  );
+}
+
+function Gaps({ onBack }) {
   const [d, setD] = useState(null);
   useEffect(() => { api.get('/admin/help/gaps').then(setD).catch(() => setD({ gaps: [], asked: 0, answered: 0 })); }, []);
-  if (!d) return <p className="muted" role="status">Loading…</p>;
   return (
-    <section className="card">
-      <h3 style={{ marginTop: 0 }}>Questions Help could not answer</h3>
-      <p className="muted small">{d.asked} questions asked, {d.answered} answered. Questions that found nothing, or that someone marked not helpful, are listed here.</p>
-      {!d.gaps.length ? <Empty>Nothing missing so far.</Empty> : <ul className="hp-gaps">{d.gaps.map((g) => <li key={g.q}><span>{g.q}</span><small className="muted">{g.n}× · {ago(g.last)}{g.unhelpful ? ` · ${g.unhelpful} marked not helpful` : ''}</small></li>)}</ul>}
+    <section className="hx-gaps">
+      <button className="hx-back" onClick={onBack}>← Back to Help</button>
+      <h3>Questions Help could not answer</h3>
+      {!d ? <p className="muted" role="status">Loading…</p> : <>
+        <p className="muted small">{d.asked} asked, {d.answered} answered. Questions that found nothing, or were marked not helpful, are listed here.</p>
+        {!d.gaps.length ? <Empty>Nothing missing so far.</Empty> : <ul>{d.gaps.map((g) => <li key={g.q}><span>{g.q}</span><small>{g.n}× · {ago(g.last)}{g.unhelpful ? ` · ${g.unhelpful} not helpful` : ''}</small></li>)}</ul>}
+      </>}
     </section>
   );
 }
 
 export default function Help() {
   const [sp] = useSearchParams(); const from = sp.get('from') || ''; const initQ = sp.get('q') || '';
-  const [msgs, setMsgs] = useState(load); const [q, setQ] = useState(''); const [busy, setBusy] = useState(false); const [meta, setMeta] = useState(null); const [area, setArea] = useState(null); const [pageTopics, setPageTopics] = useState([]); const [tab, setTab] = useState('ask');
-  const box = useRef(null); const inp = useRef(null); const end = useRef(null);
-  const [checks, setChecks] = useState([]); const [pf, setPf] = useState(''); const [pages, setPages] = useState([]);
-  useEffect(() => { api.get('/admin/help/checks').then((d) => setChecks(d.checks || [])).catch(() => {}); }, []);
-  useEffect(() => { const h = setTimeout(() => { api.get(`/admin/help/pages?q=${encodeURIComponent(pf)}`).then((d) => setPages(d.pages || [])).catch(() => {}); }, 200); return () => clearTimeout(h); }, [pf]);
-  useEffect(() => { api.get('/admin/help').then(setMeta).catch(() => setMeta({ areas: [], suggested: [], popular: [], recent: [] })); }, []);
+  const [thread, setThread] = useState(load); const [q, setQ] = useState(''); const [busy, setBusy] = useState(false);
+  const [meta, setMeta] = useState(null); const [checks, setChecks] = useState([]); const [pageTopics, setPageTopics] = useState([]);
+  const [idea, setIdea] = useState(Object.keys(IDEAS)[0]); const [sug, setSug] = useState([]); const [hi, setHi] = useState(-1); const [browse, setBrowse] = useState(false); const [area, setArea] = useState(null); const [view, setView] = useState('help');
+  const inp = useRef(null); const end = useRef(null);
+  useEffect(() => { api.get('/admin/help').then(setMeta).catch(() => setMeta({ areas: [] })); api.get('/admin/help/checks').then((d) => setChecks(d.checks || [])).catch(() => {}); }, []);
   useEffect(() => { if (from) api.get(`/admin/help/page?path=${encodeURIComponent(from)}`).then((r) => setPageTopics(r.topics)).catch(() => {}); }, [from]);
-  useEffect(() => { save(msgs); end.current?.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' }); }, [msgs]);
+  useEffect(() => { save(thread.filter((x) => x.res)); }, [thread]);
+  useEffect(() => { end.current?.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' }); }, [thread.length]);
   useEffect(() => { const h = (e) => { if (e.key === '/' && !/INPUT|TEXTAREA|SELECT/.test(document.activeElement?.tagName)) { e.preventDefault(); inp.current?.focus(); } }; window.addEventListener('keydown', h); return () => window.removeEventListener('keydown', h); }, []);
-  const push = (m) => setMsgs((x) => [...x, { id: nid(), ...m }]);
-  const ask = useCallback(async (text, replaceLast = false) => {
-    const t = String(text || '').trim(); if (!t || busy) return; setBusy(true); setQ('');
-    if (!replaceLast) push({ from: 'me', text: t });
-    try { const r = await api.post('/admin/help/ask', { q: t }); const m = { from: 'bot', ...r, text: '' }; if (replaceLast) setMsgs((x) => { const i = x.map((y) => y.q).lastIndexOf(t); return i < 0 ? [...x, { id: nid(), ...m }] : x.map((y, k) => (k === i ? { ...y, ...m } : y)); }); else push(m); }
-    catch (e) { push({ from: 'bot', kind: 'error', say: e.message || 'Something went wrong. Try again.' }); } finally { setBusy(false); inp.current?.focus(); }
-  }, [busy]);
-  const open = useCallback(async (id) => { setBusy(true); try { const r = await api.get(`/admin/help/topic/${id}`); push({ from: 'me', text: r.card.title }); push({ from: 'bot', kind: 'answer', card: r.card, alternatives: [] }); } catch (e) { toast(e.message, 'bad'); } finally { setBusy(false); } }, []);
-  useEffect(() => { if (initQ) ask(initQ); /* eslint-disable-next-line */ }, []);
-  const pickArea = async (name) => { setArea({ name, topics: null }); try { const r = await api.get(`/admin/help/area/${encodeURIComponent(name)}`); setArea(r.area ? { name: r.area, topics: r.topics } : null); } catch { setArea(null); } };
-  const clear = async () => { setMsgs([]); try { await api.del('/admin/help/history'); sessionStorage.removeItem(KEY); } catch { /* */ } api.get('/admin/help').then(setMeta).catch(() => {}); };
-  const onKey = (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); ask(q); } if (e.key === 'Escape') setQ(''); };
+  useEffect(() => { if (q.trim().length < 2) { setSug([]); return undefined; } const h = setTimeout(() => api.get(`/admin/help/suggest?q=${encodeURIComponent(q)}`).then((d) => { setSug(d.items || []); setHi(-1); }).catch(() => {}), 150); return () => clearTimeout(h); }, [q]);
 
+  const run = useCallback(async (text, id) => {
+    const t = String(text || '').trim(); if (!t) return; setSug([]); setQ('');
+    const eid = id || nid(); if (!id) setThread((x) => [...x, { id: eid, q: t, res: null }]); else setThread((x) => x.map((y) => (y.id === id ? { ...y, res: null } : y)));
+    setBusy(true);
+    try { const res = await api.post('/admin/help/ask', { q: t }); setThread((x) => x.map((y) => (y.id === eid ? { ...y, res } : y))); }
+    catch (e) { setThread((x) => x.map((y) => (y.id === eid ? { ...y, res: { error: e.message || 'Something went wrong. Try again.' } } : y))); }
+    finally { setBusy(false); }
+  }, []);
+  const open = useCallback(async (id) => { const eid = nid(); try { const r = await api.get(`/admin/help/topic/${id}`); setThread((x) => [...x, { id: eid, q: r.card.title, res: { kind: 'answer', card: r.card, alternatives: [] } }]); } catch (e) { toast(e.message, 'bad'); } }, []);
+  useEffect(() => { if (initQ) run(initQ); /* eslint-disable-next-line */ }, []);
+  const pickArea = async (name) => { setArea({ name, topics: null }); try { const r = await api.get(`/admin/help/area/${encodeURIComponent(name)}`); setArea({ name, topics: r.topics }); } catch { setArea(null); } };
+  const clear = async () => { setThread([]); try { await api.del('/admin/help/history'); sessionStorage.removeItem(KEY); } catch { /* */ } };
+  const choose = (s) => { if (s.type === 'topic') { setQ(''); setSug([]); open(s.id); } else run(s.text); };
+  const onKey = (e) => {
+    if (sug.length && e.key === 'ArrowDown') { e.preventDefault(); setHi((h) => (h + 1) % sug.length); }
+    else if (sug.length && e.key === 'ArrowUp') { e.preventDefault(); setHi((h) => (h <= 0 ? sug.length - 1 : h - 1)); }
+    else if (e.key === 'Enter') { e.preventDefault(); if (hi >= 0 && sug[hi]) choose(sug[hi]); else run(q); }
+    else if (e.key === 'Escape') { setSug([]); setQ(''); }
+  };
+  const empty = !thread.length;
+
+  const box = (
+    <div className="hx-box">
+      <div className="hx-field">
+        <input ref={inp} value={q} maxLength={300} placeholder="Ask about students, teachers, mocks, or how to do something" aria-label="Ask Help" autoComplete="off" role="combobox" aria-expanded={sug.length > 0} aria-controls="hx-sug" onChange={(e) => setQ(e.target.value)} onKeyDown={onKey} />
+        <button className="btn btn-primary" disabled={busy || q.trim().length < 2} onClick={() => run(q)}>Ask</button>
+      </div>
+      {sug.length > 0 && <ul id="hx-sug" className="hx-sug" role="listbox">{sug.map((s, i) => <li key={s.text} role="option" aria-selected={i === hi} className={i === hi ? 'on' : ''} onMouseDown={(e) => { e.preventDefault(); choose(s); }}><span>{s.text}</span><small>{s.type === 'topic' ? 'Guide' : 'Data'}</small></li>)}</ul>}
+    </div>
+  );
+
+  if (view === 'gaps') return <><PageHead title="Help" /><Gaps onBack={() => setView('help')} /></>;
   return (
-    <>
-      <PageHead title="Help" sub="Ask anything about running the platform. Get the answer, the steps, and a button that opens the right page.">
-        <div className="ad-tabs" style={{ margin: 0, border: 0 }} role="tablist">{[['ask', 'Ask'], ...(meta?.canGaps ? [['gaps', 'Missing answers']] : [])].map(([k, l]) => <button key={k} role="tab" aria-selected={tab === k} className={tab === k ? 'on' : ''} onClick={() => setTab(k)}>{l}</button>)}</div>
-      </PageHead>
-      {tab === 'gaps' ? <Gaps /> : (
-        <div className="hp-wrap">
-          <section className="hp-chat card" aria-label="Conversation">
-            <div className="hp-log" ref={box} role="log" aria-live="polite">
-              {!msgs.length && (
-                <div className="hp-empty">
-                  <h3>What do you want to do?</h3>
-                  <p className="muted">Type a question in your own words. For example “how do I lock a teacher’s account” or “how much disk space is left”.</p>
-                  {checks.length > 0 && <div className="hp-checks" aria-label="Quick checks">{checks.map((c) => <Link key={c.key} to={c.to} className={`hp-check t-${c.tone}`}><span>{c.label}</span><b>{c.value}</b></Link>)}</div>}
-                  <p className="small muted" style={{ marginTop: 14 }}>Find a page</p>
-                  <input className="input" value={pf} onChange={(e) => setPf(e.target.value)} placeholder="Type a page name, for example backup" aria-label="Find a page" style={{ maxWidth: 320 }} />
-                  <div className="hp-chips" style={{ marginTop: 8 }}>{pages.map((g) => <Link key={g.to} className="chip" to={g.to}>{g.label}</Link>)}</div>
-                  <div className="hp-chips">{(meta?.suggested || []).map((s) => <button key={s} className="chip" onClick={() => ask(s)}>{s}</button>)}</div>
-                  {meta?.recent?.length > 0 && <><p className="small muted" style={{ marginTop: 14 }}>Your recent questions</p><div className="hp-chips">{meta.recent.map((s) => <button key={s} className="chip ghost" onClick={() => ask(s)}>{s}</button>)}</div></>}
-                </div>)}
-              {msgs.map((m) => m.from === 'me' ? <div key={m.id} className="hp-msg me">{m.text}</div> : m.kind === 'error' ? <div key={m.id} className="hp-msg bot"><p className="sx-bad">{m.say}</p></div> : <Answer key={m.id} m={m} onAsk={(t) => ask(t)} onOpen={open} onRefresh={(t) => ask(t, true)} />)}
-              {busy && <div className="hp-msg bot hp-typing" role="status" aria-label="Looking for an answer"><i /><i /><i /></div>}
-              <div ref={end} />
-            </div>
-            <form className="hp-input" onSubmit={(e) => { e.preventDefault(); ask(q); }}>
-              <textarea ref={inp} rows={1} value={q} maxLength={300} placeholder="Ask a question…  (press / to jump here)" aria-label="Your question" onChange={(e) => setQ(e.target.value)} onKeyDown={onKey} />
-              <button className="btn btn-primary" disabled={busy || q.trim().length < 2}>Ask</button>
-            </form>
-            {msgs.length > 0 && <p className="hp-clear"><button className="btn btn-ghost btn-sm" onClick={clear}>Clear conversation</button></p>}
-          </section>
-          <aside className="hp-side">
-            {pageTopics.length > 0 && <section className="card"><h3>About the page you came from</h3><ul className="hp-list">{pageTopics.map((t) => <li key={t.id}><button className="hp-link" onClick={() => open(t.id)}>{t.title}</button></li>)}</ul></section>}
-            <section className="card"><h3>Browse by topic</h3>
-              <div className="hp-areas">{(meta?.areas || []).map((a) => <button key={a.name} className={`chip ${area?.name === a.name ? 'on' : ''}`} aria-pressed={area?.name === a.name} onClick={() => (area?.name === a.name ? setArea(null) : pickArea(a.name))}>{a.name} <small>{a.count}</small></button>)}</div>
-              {area && <ul className="hp-list" style={{ marginTop: 10 }}>{!area.topics ? <li className="muted small">Loading…</li> : area.topics.map((t) => <li key={t.id}><button className="hp-link" onClick={() => open(t.id)}>{t.title}</button></li>)}</ul>}
-            </section>
-            {meta?.popular?.length > 0 && <section className="card"><h3>Often asked</h3><ul className="hp-list">{meta.popular.map((t) => <li key={t.id}><button className="hp-link" onClick={() => open(t.id)}>{t.title}</button></li>)}</ul></section>}
-          </aside>
+    <div className="hx">
+      <PageHead title="Help" sub="Ask in plain words. Get live data or step-by-step guidance." />
+      {empty ? (
+        <div className="hx-start">
+          {box}
+          {checks.length > 0 && <div className="hx-checks" aria-label="Quick checks">{checks.map((c) => <Link key={c.key} to={c.to} className={`t-${c.tone}`}><i aria-hidden="true" />{c.label}<b>{c.value}</b></Link>)}</div>}
+          <div className="hx-ideas">
+            <div className="hx-itabs" role="tablist">{Object.keys(IDEAS).map((k) => <button key={k} role="tab" aria-selected={idea === k} className={idea === k ? 'on' : ''} onClick={() => setIdea(k)}>{k}</button>)}</div>
+            <ul>{IDEAS[idea].map((s) => <li key={s}><button onClick={() => run(s)}>{s}</button></li>)}</ul>
+          </div>
+          {pageTopics.length > 0 && <div className="hx-here"><span>About the page you came from</span>{pageTopics.map((t) => <button key={t.id} className="hx-chip" onClick={() => open(t.id)}>{t.title}</button>)}</div>}
+        </div>
+      ) : (
+        <div className="hx-thread" role="log" aria-live="polite">
+          {thread.map((e) => (
+            <section key={e.id} className="hx-turn">
+              <h2 className="hx-q">{e.q}</h2>
+              <Answer e={e} onAsk={(t) => run(t)} onOpen={open} onRefresh={(x) => run(x.q, x.id)} />
+            </section>))}
+          <div ref={end} />
         </div>
       )}
-    </>
+      {!empty && <div className="hx-dock">{box}</div>}
+      <footer className="hx-foot">
+        <button onClick={() => setBrowse((b) => !b)} aria-expanded={browse}>{browse ? 'Hide topics' : `Browse all ${meta?.total || ''} topics`}</button>
+        {!empty && <button onClick={clear}>Clear conversation</button>}
+        {meta?.canGaps && <button onClick={() => setView('gaps')}>Missing answers</button>}
+      </footer>
+      {browse && (
+        <div className="hx-browse">
+          <div className="hx-areas">{(meta?.areas || []).map((a) => <button key={a.name} className={area?.name === a.name ? 'on' : ''} aria-pressed={area?.name === a.name} onClick={() => (area?.name === a.name ? setArea(null) : pickArea(a.name))}>{a.name}<small>{a.count}</small></button>)}</div>
+          {area && <ul>{!area.topics ? <li className="muted small">Loading…</li> : area.topics.map((t) => <li key={t.id}><button onClick={() => { open(t.id); setBrowse(false); }}>{t.title}</button></li>)}</ul>}
+        </div>)}
+    </div>
   );
 }

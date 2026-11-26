@@ -5,6 +5,7 @@ import { KB, AREAS, SYNONYMS, STOP, SUGGESTED } from './helpkb.js';
 import { dbFile } from './lib/restore.js';
 import { listBackups } from './ops.js';
 import { startedAt, recentErrors } from './lib/health.js';
+import { makeDataEngine, DATA_EXAMPLES_ALL } from './helpdata.js';
 
 const norm = (s) => String(s || '').toLowerCase().replace(/[’']/g, '').replace(/[^a-z0-9+ ]+/g, ' ').replace(/\s+/g, ' ').trim();
 const stem = (w) => (w.length > 4 && w.endsWith('ies') ? `${w.slice(0, -3)}y` : w.length > 4 && w.endsWith('ing') ? w.slice(0, -3) : w.length > 3 && w.endsWith('es') && /(ch|sh|x|ss)es$/.test(w) ? w.slice(0, -2) : w.length > 3 && w.endsWith('s') && !w.endsWith('ss') ? w.slice(0, -1) : w.length > 4 && w.endsWith('ed') ? w.slice(0, -2) : w);
@@ -41,6 +42,7 @@ export function mountHelp({ r, db, now, audit, bad, jobs }) {
     CREATE INDEX IF NOT EXISTS idx_help_log_at ON help_log(at);`);
   const one = (sql, ...a) => db.prepare(sql).get(...a); const all = (sql, ...a) => db.prepare(sql).all(...a);
   const SIM = '%@loadtest.invalid';
+  const data = makeDataEngine({ db, now });
 
   function live(q) {
     const t = now(); const s = norm(q); const L = []; let title = '', go = [];
@@ -90,13 +92,18 @@ export function mountHelp({ r, db, now, audit, bad, jobs }) {
     else if (/^(thanks|thank you|thx|ok thanks|great|cool)\b/.test(s) && s.split(' ').length <= 4) { out.kind = 'chat'; out.say = 'You are welcome. Ask another time if you need anything.'; }
     else if (/\b(what can you (do|help)|what do you do|help me|what can i ask)\b/.test(s)) { out.kind = 'chat'; out.say = 'I can explain any feature, give you step-by-step instructions, open the right page for you, and answer quick questions like "how many students do I have?" or "is the server okay?". Try one of the suggestions below.'; out.alternatives = SUGGESTED.slice(0, 5).map((t) => ({ id: null, title: t, ask: true })); }
     if (out.kind === 'answer') {
-      out.live = live(q); const m = search(q); const best = m.results[0];
+      const m = search(q); const best = m.results[0];
+      const howto = /^(how (do|can|to|should|would)|where (do|can)|what is|what are|what does|explain|why|can i|steps|guide|is it possible)\b/.test(s) && !/\bhow many\b/.test(s);
+      try { out.data = howto && m.strong ? null : data.answer(q); } catch (e) { out.data = null; if (process.env.HELP_DEBUG) console.error(e); }
+      out.live = out.data ? null : live(q);
+      if (out.data) { out.kind = 'data'; out.alternatives = m.results.filter((x) => x.score >= 6).slice(0, 2).map((x) => ({ id: x.id, title: x.title })); out.matched = null; out.score = 5; }
+      else
       if (m.strong && best) { out.card = card(byId.get(best.id)); out.alternatives = m.results.slice(1, 4).map((x) => ({ id: x.id, title: x.title })); out.fixed = m.fixed; }
       else if (m.results.length && best.score >= 2.5) { out.kind = 'maybe'; out.say = out.live ? '' : 'I am not sure I understood. Is it one of these?'; out.alternatives = m.results.slice(0, 4).map((x) => ({ id: x.id, title: x.title })); }
       else if (!out.live) { out.kind = 'none'; out.say = 'I do not have an answer for that yet. I have saved your question so it can be added. You can browse by topic below.'; }
       out.matched = out.card?.id || null; out.score = best?.score ?? 0;
     }
-    const ins = db.prepare('INSERT INTO help_log(user_id,q,matched,score,at) VALUES (?,?,?,?,?)').run(req.user.id, q, out.card?.id || (out.kind === 'none' ? null : out.alternatives[0]?.id || null), out.score ?? 0, now()); out.logId = Number(ins.lastInsertRowid);
+    const ins = db.prepare('INSERT INTO help_log(user_id,q,matched,score,at) VALUES (?,?,?,?,?)').run(req.user.id, q, out.card?.id || (out.data ? 'data' : null) || (out.kind === 'none' ? null : out.alternatives[0]?.id || null), out.score ?? 0, now()); out.logId = Number(ins.lastInsertRowid);
     res.json(out);
   });
 
@@ -113,6 +120,13 @@ export function mountHelp({ r, db, now, audit, bad, jobs }) {
     out.push({ key: 'support', label: 'Waiting for reply', value: tk, tone: tk > 10 ? 'warn' : 'good', to: '/admin/support' });
     return out;
   }
+  // type-ahead: matching guides plus example data questions
+  r.get('/help/suggest', (req, res) => {
+    const q = String(req.query.q || '').slice(0, 120); if (norm(q).length < 2) return res.json({ items: [] });
+    const w = toks(q); const ex = DATA_EXAMPLES_ALL.filter((e) => w.length && w.every((t) => toks(e).some((x) => x.startsWith(t) || t.startsWith(x)))).slice(0, 3).map((t) => ({ type: 'ask', text: t }));
+    const g = search(q, { limit: 4 }).results.filter((x) => x.score >= 2).map((x) => ({ type: 'topic', id: x.id, text: x.title }));
+    res.json({ items: [...ex, ...g].slice(0, 6) });
+  });
   r.get('/help/checks', (req, res) => res.json({ checks: checks() }));
   // page finder: every page a topic links to, searchable by its label
   r.get('/help/pages', (req, res) => {

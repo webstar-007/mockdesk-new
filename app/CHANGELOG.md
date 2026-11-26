@@ -1,5 +1,10 @@
 # What's new in MockDesk
 
+## v26: Help redesign and data answers
+**Clean Help.** One search box with type-ahead, quick-check pills, and four idea tabs (People, Mocks and results, Platform, How do I…). Answers appear as a simple question-and-answer thread; the busy side panels are gone and "Browse all topics" is one click away at the bottom.
+**Ask for data.** Help now reads live data in plain words: profiles for any student, teacher, editor or admin (scores, trend, batches, tickets, recent activity); top and lowest students, inactive or never-started students, new sign-ups, who is online; teachers, staff and admins; batches and batches without a teacher; the hardest or most attempted mock; tests finished today or this week; open tickets and reports; doubts; certificates; failed sign-ins; what admins did recently; a platform overview. How-to questions still get the step-by-step guide. Test accounts are never counted.
+**Tables.** Sort by any column, filter long lists, copy, download CSV, refresh, and click a row to open the full page.
+
 ## v25: Load test rework
 **Fixes.** Limits raised (up to 1000 students, 15 minutes). Measurement no longer loads the server it is measuring (light live poll, cached mock list). Integrity pings stop after a student submits, so they no longer show as false errors. Sign-in and sign-up no longer block the server while hashing passwords.
 **New patterns.** Staircase (equal steps) and Waves (a big start, then a second wave at half time), plus a warm-up period that is left out of the results.
