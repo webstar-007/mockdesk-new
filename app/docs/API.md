@@ -153,3 +153,5 @@ Load test additions: `GET /admin/loadtest/report/:id`, `PUT /admin/loadtest/repo
 - Admin: the same under `/admin/batch-health` and `/admin/desk`, plus `GET /admin/certificates?q&page`, `PUT /admin/certificates-config`, `POST /admin/certificates/issue {contact, title, detail}`, `POST /admin/certificates/:code/revoke {undo}`, `GET|PUT /admin/mock-reminders`.
 - Student: `GET /attempts/:id/desk`, `POST /attempts/:id/desk {questionId, text}`, `GET /my/certificates` (issues anything newly earned).
 - Public: `GET /public/certificate/:code` (name, title, date, valid; no contact details).
+
+Load test v25: `POST /admin/loadtest/preflight` (same body as start; returns `blockers`, `warnings`, `est`), `GET /admin/loadtest/live` (light poll of the running test), `POST /admin/loadtest/signin-bench` (`count`). `start` also accepts `pattern` steps|waves, `stepCount`, `warmupSec`, `integrityPerMin`, `homePerMin`, `sectionMoves`, `sectionAtPct`, `targets`, and custom requests with `method`/`body`.

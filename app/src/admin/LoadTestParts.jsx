@@ -6,10 +6,10 @@ export const MB = 1048576;
 export const bytes = (b) => (b == null ? '–' : b > 1073741824 ? `${(b / 1073741824).toFixed(1)} GB` : `${Math.round(b / MB)} MB`);
 export const ms = (v) => (v == null ? '–' : v >= 1000 ? `${(v / 1000).toFixed(1)} s` : `${Math.round(v)} ms`);
 export const TONE = { good: 'good', ok: 'good', warn: 'warn', bad: 'bad', info: '' };
-export const SHAPES = [['steady', 'Steady', 'Students join over a short spread and keep working. Like a normal exam start.'], ['spike', 'All at once', 'Everyone joins in the first second. Like a live mock where the link goes out at 10:00.'], ['ramp', 'Gradual climb', 'Students join one by one all through the test. Finds the point where the server starts to struggle.']];
+export const SHAPES = [['steady', 'Steady', 'Students join over a short spread and keep working. Like a normal exam start.'], ['spike', 'All at once', 'Everyone joins in the first second. Like a live mock where the link goes out at 10:00.'], ['ramp', 'Gradual climb', 'Students join one by one all through the test. Finds the point where the server starts to struggle.'], ['steps', 'Staircase', 'Students join in equal groups, with a pause between. Shows how the server does at each size, step by step.'], ['waves', 'Two waves', 'Most students join at the start and a second group arrives halfway. Like latecomers or a second batch.']];
 const SHAPE_NAME = Object.fromEntries(SHAPES.map(([k, n]) => [k, n]));
 export const shapeName = (k) => SHAPE_NAME[k || 'steady'];
-const KIND_NAMES = { open: 'Open the test', save: 'Autosave answers', poll: 'Check progress', submit: 'Submit the test', result: 'Open the result', review: 'Review page (trick corner)', pdf: 'Download PDF report' };
+const KIND_NAMES = { open: 'Open the test', save: 'Autosave answers', poll: 'Check progress', submit: 'Submit the test', result: 'Open the result', review: 'Review page (4 calls each)', pdf: 'Download PDF report', section: 'Move to the next section', integrity: 'Tab-switch reports', home: 'Open the site home page' };
 export const kindLabel = (k) => KIND_NAMES[k] || (k.startsWith('page:') ? `Page ${k.slice(5)}` : k.startsWith('custom:') ? `Custom ${k.slice(7)}` : k);
 export const kindOrder = (ks) => [...Object.keys(KIND_NAMES).filter((k) => ks.includes(k)), ...ks.filter((k) => !KIND_NAMES[k]).sort()];
 export const title = (x) => x.label || `${x.users} students, ${dt(x.at)}`;
@@ -71,6 +71,47 @@ function Curve({ curve, limit }) {
   );
 }
 
+/** The admin's own pass or fail targets, one line each. */
+function Targets({ t }) {
+  if (!t) return null;
+  return (
+    <section className={`card lt-targets ${t.pass ? 'ok' : 'no'}`} aria-label="Your targets">
+      <h3 style={{ marginTop: 0 }}>{t.pass ? 'Meets all your targets' : `Misses ${t.total - t.passed} of ${t.total} targets`}{t.stoppedEarly ? ' (the test stopped early)' : ''}</h3>
+      <ul className="lt-tlist">{t.items.map((x) => <li key={x.key} className={x.pass ? 'pass' : 'fail'}><span aria-hidden="true">{x.pass ? '✓' : '✗'}</span><b>{x.label}</b><em>{x.unit === 'ms' ? ms(x.actual) : `${x.actual}%`} <small>target {x.unit === 'ms' ? ms(x.limit) : `${x.limit}%`} or less</small></em></li>)}</ul>
+    </section>
+  );
+}
+
+/** Staircase result: how the server did at each step of more students. */
+function Steps({ steps }) {
+  if (!steps?.length) return null;
+  return (
+    <section className="card" style={{ padding: 0, marginTop: 12 }}>
+      <h3 style={{ padding: '12px 14px 0', margin: 0 }}>Step by step</h3><p className="muted small" style={{ padding: '0 14px' }}>The first moment after each group joined is skipped so the numbers show a settled server.</p>
+      <div style={{ overflowX: 'auto' }}><table className="ad-table"><thead><tr><th>Step</th><th>Students</th><th>Requests per second</th><th>Slowest p95</th><th>Failed</th><th>App CPU peak</th></tr></thead>
+        <tbody>{steps.map((x) => <tr key={x.step}><td>{x.step}</td><td>{x.users}</td><td>{x.rps}</td><td><b className={x.p95 > 800 ? 'sx-bad' : ''}>{ms(x.p95)}</b></td><td>{x.errorPct}%</td><td>{x.cpu}%</td></tr>)}</tbody></table></div>
+    </section>
+  );
+}
+
+/** Autosave speed across saved tests, oldest to newest: did the last change help? */
+export function Trend({ h }) {
+  const list = (h || []).filter((x) => x.hasReport && x.p95 != null).slice(0, 12).reverse(); if (list.length < 2) return null;
+  const data = list.map((x, i) => ({ t: i, p95: x.p95, errors: x.errorPct * 100 })); const top = Math.max(300, ...list.map((x) => x.p95)) * 1.15;
+  const W = 520, H = 120, L = 44, R = 10, T = 10, B = 22; const xs = (i) => L + (i / (list.length - 1)) * (W - L - R); const ys = (v) => T + (H - T - B) - Math.min(1, v / top) * (H - T - B);
+  return (
+    <section className="card" style={{ margin: '12px 0' }}>
+      <h3 style={{ margin: '0 0 4px' }}>Autosave speed over your last {list.length} tests</h3><p className="muted small" style={{ margin: '0 0 6px' }}>Lower is better. Each dot is one test, oldest on the left.</p>
+      <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label="Autosave response time across saved tests" style={{ width: '100%', maxHeight: 150 }}>
+        {[0, 0.5, 1].map((f) => <g key={f}><line x1={L} x2={W - R} y1={ys(top * f)} y2={ys(top * f)} className="lt-grid" /><text x={L - 5} y={ys(top * f) + 3} textAnchor="end" className="lt-ax">{Math.round(top * f)} ms</text></g>)}
+        <path className="lt-line" style={{ stroke: 'var(--brand)' }} d={data.map((d, j) => `${j ? 'L' : 'M'}${xs(j).toFixed(1)},${ys(d.p95).toFixed(1)}`).join('')} />
+        {list.map((x, i) => <g key={x.id}><circle cx={xs(i)} cy={ys(x.p95)} r="4.5" fill={x.level === 'bad' ? 'var(--bad)' : x.level === 'warn' ? '#d99a1e' : 'var(--brand)'}><title>{`${x.label || `${x.users} students`}: ${Math.round(x.p95)} ms`}</title></circle><text x={xs(i)} y={H - 5} textAnchor="middle" className="lt-ax">{x.users}</text></g>)}
+      </svg>
+      <small className="muted">Numbers under the dots are the students in each test.</small>
+    </section>
+  );
+}
+
 /** "Will it handle N students?" using the numbers from this test. */
 function Planner({ rep }) {
   const [n, setN] = useState(Math.max(rep.config.users * 2, 100)); const u = rep.config.users;
@@ -125,6 +166,8 @@ export function Report({ rep, onAgain, onRerun, onCompare, onChanged, prevId }) 
         <Stat icon="📨" label="Requests sent" value={rep.totals.requests} sub={`${rep.totals.avgRps} per second on average`} /><Stat icon="⚡" label="Busiest second" value={`${rep.totals.peakRps}/s`} />
         <Stat icon="⏱" label="95th percentile, all requests" value={ms(rep.totals.p95)} sub={`slowest ${ms(rep.totals.max)}`} /><Stat icon="⚠" label="Failed requests" value={`${rep.totals.errors} (${rep.totals.errorPct}%)`} tone={rep.totals.errors ? 'bad' : 'good'} />
       </div>
+      <Targets t={rep.targets} />
+      <Steps steps={rep.steps} />
       <Curve curve={rep.curve} limit={rep.measuredLimit} />
       <div style={{ marginTop: 12, display: 'grid', gap: 12 }}>
         <section className="card" style={{ padding: 0 }}>
@@ -187,6 +230,8 @@ export function Results({ h, onOpen, onCompare, onChanged, onRerunId }) {
   const act = async (fn, id) => { setBusy(id); try { await fn(); onChanged(); } catch (e) { toast(e.message, 'bad'); } finally { setBusy(''); } };
   const ordered = sel.map((id) => h.find((x) => x.id === id)).filter(Boolean).sort((p, q) => p.at - q.at);
   return (
+    <>
+    <Trend h={h} />
     <section className="card" style={{ padding: 0 }}>
       <div className="lt-rbar"><h3 style={{ margin: 0 }}>Saved tests</h3><span className="muted small">Tick two tests to compare them. The last 15 are kept, plus any you pin.</span>
         <button className="btn btn-primary btn-sm" disabled={sel.length !== 2 || ordered.some((x) => !x.hasReport)} onClick={() => onCompare(ordered[0].id, ordered[1].id)}>Compare the two</button>
@@ -196,9 +241,10 @@ export function Results({ h, onOpen, onCompare, onChanged, onRerunId }) {
           <td><input type="checkbox" aria-label={`Select ${title(x)} to compare`} checked={sel.includes(x.id)} disabled={!x.hasReport} onChange={() => toggle(x.id)} /></td>
           <td>{x.hasReport ? <button className="sx-link" onClick={() => onOpen(x.id)}>{x.label || 'Untitled test'}</button> : <span>{x.label || 'Older test'}</span>}{x.pinned && <> <Badge>Pinned</Badge></>}<div className="muted small">{dt(x.at)}</div></td>
           <td>{x.users} for {x.durationSec}s<div className="muted small">{shapeName(x.pattern)}</div></td><td>{ms(x.p95)}</td><td>{x.errorPct}%</td><td>{x.peakCpu}%</td><td>{x.score ?? '–'}</td>
-          <td><Badge tone={TONE[x.level]}>{x.title}{x.stopped ? ' (stopped)' : ''}</Badge></td>
+          <td><Badge tone={TONE[x.level]}>{x.title}{x.stopped ? ' (stopped)' : ''}</Badge>{x.targets && <div className={`small ${x.targets.pass ? '' : 'sx-bad'}`}>{x.targets.pass ? '✓ Targets met' : `✗ ${x.targets.total - x.targets.passed} target${x.targets.total - x.targets.passed > 1 ? 's' : ''} missed`}</div>}</td>
           <td className="lt-row-act">{x.hasReport ? <><button className="btn btn-ghost btn-sm" onClick={() => onOpen(x.id)}>Open</button><button className="btn btn-ghost btn-sm" disabled={busy === x.id} onClick={() => act(() => api.put(`/admin/loadtest/report/${x.id}`, { pinned: !x.pinned }), x.id)}>{x.pinned ? 'Unpin' : 'Pin'}</button><button className="btn btn-ghost btn-sm" onClick={() => onRerunId(x.id)}>Run again</button></> : <span className="muted small">Summary only</span>}
             <button className="btn btn-ghost btn-sm" disabled={busy === x.id} onClick={() => act(() => api.del(`/admin/loadtest/report/${x.id}`), x.id)}>Delete</button></td></tr>)}</tbody></table></div>
     </section>
+    </>
   );
 }

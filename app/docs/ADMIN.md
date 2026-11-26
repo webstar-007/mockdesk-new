@@ -205,3 +205,6 @@ Loading uses a top progress line, a self-drawing tick and skeleton screens; numb
 - **Doubt desk** (*Messages > Doubt desk*). Needs the Support permission. Sharing an answer shows it under that question on other students' review pages.
 - **Scheduled mocks** (*Messages > Reminder rules*). Reminders respect quiet hours and each student's notification settings, and run with the other automatic reminders.
 - **Certificates** (*Students > Certificates*). Rules: mocks for Completion (default 5), percent for Merit (default 80). A withdrawn certificate is never re-issued; restore it instead. Public check page: `/c/CODE`.
+
+## v25: Load test rework
+Setup now has a live preflight (blockers stop Start, warnings are advice), pass/fail Targets, a warm-up period excluded from results, Staircase and Waves arrival patterns, section-move, tab-switch and home-page actions, custom requests with GET/POST/PUT and bodies (`{attempt}`, `{question}`; only safe write paths are allowed), up to 1000 students and 15 minutes, and a Sign-in speed check card. Reports show Targets, per-step results and a trend across saved tests.

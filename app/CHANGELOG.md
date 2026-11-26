@@ -1,5 +1,13 @@
 # What's new in MockDesk
 
+## v25: Load test rework
+**Fixes.** Limits raised (up to 1000 students, 15 minutes). Measurement no longer loads the server it is measuring (light live poll, cached mock list). Integrity pings stop after a student submits, so they no longer show as false errors. Sign-in and sign-up no longer block the server while hashing passwords.
+**New patterns.** Staircase (equal steps) and Waves (a big start, then a second wave at half time), plus a warm-up period that is left out of the results.
+**New student actions.** Section moves, tab-switch reports, home page visits; custom requests can now be GET or safe POST/PUT with a body and `{attempt}`/`{question}` placeholders.
+**Pass/fail targets.** Set limits for p95, error rate, throughput, CPU, memory, event-loop lag and DB write time; every report shows what passed and failed, and trends are shown across saved tests.
+**Preflight.** The setup page explains problems before you start (blockers stop Start, warnings do not) and estimates requests, rate and database growth.
+**Sign-in speed check.** Times real password checks and estimates how long N students take to sign in together.
+
 ## v24: Batch health, Doubt desk, mock reminders and certificates
 **Batch health (Students > Batch health; teachers: Health).** Every student in a batch is ranked Needs attention, Keep an eye or On track from score drops, days since last seen, overdue assignments, very low averages and "never started". Tick students and Nudge them in one click: a fitting default message per student, or your own. One nudge per student per day.
 **Doubt desk (students: Ask a teacher on the review page; teachers: Doubts; admins: Messages > Doubt desk).** Teachers see the question, the right answer and what the student chose, then reply. Tick "show to others" and the answer appears under that question for everyone who reviews it. Students are notified; limits are 5 waiting and 10 a day.

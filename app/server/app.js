@@ -54,6 +54,8 @@ const INSTRUCTIONS = [
 ];
 
 const hashPw = (pw, salt) => crypto.scryptSync(pw, salt, 64).toString('hex');
+// Sign-in and sign-up hash on the thread pool, so a rush of students logging in does not freeze everyone else's autosaves.
+const hashPwAsync = (pw, salt) => new Promise((ok, no) => crypto.scrypt(pw, salt, 64, (e, k) => (e ? no(e) : ok(k.toString('hex')))));
 const iso = (ms) => new Date(ms).toISOString();
 
 export function createApp(db, { allowIncomplete = process.env.MOCKDESK_ALLOW_INCOMPLETE === '1', now = () => Date.now(), serveClient = true, otpSender, mailer, whatsapp, drafter, credKeyFile, exitFn } = {}) {
@@ -164,7 +166,7 @@ export function createApp(db, { allowIncomplete = process.env.MOCKDESK_ALLOW_INC
     return false;
   };
 
-  api.post('/auth/register', (req, res) => {
+  api.post('/auth/register', async (req, res) => {
     if (limited(req, res)) return;
     const { name, email, password } = req.body || {};
     if (!name || !String(name).trim()) return res.status(400).json({ error: 'Name is required' });
@@ -173,19 +175,19 @@ export function createApp(db, { allowIncomplete = process.env.MOCKDESK_ALLOW_INC
     const mail = email.trim().toLowerCase();
     { const e = signupBlock(mail); if (e) return res.status(403).json({ error: e, code: 'SIGNUPS_CLOSED' }); }
     if (db.prepare('SELECT 1 FROM users WHERE email=?').get(mail)) return res.status(409).json({ error: 'An account with this email already exists' });
-    const salt = crypto.randomBytes(16).toString('hex');
-    const r = db.prepare('INSERT INTO users(name,email,salt,hash,created_at) VALUES (?,?,?,?,?)').run(String(name).trim().slice(0, 80), mail, salt, hashPw(password, salt), iso(now()));
+    const salt = crypto.randomBytes(16).toString('hex'); const hashed = await hashPwAsync(password, salt);
+    let r; try { r = db.prepare('INSERT INTO users(name,email,salt,hash,created_at) VALUES (?,?,?,?,?)').run(String(name).trim().slice(0, 80), mail, salt, hashed, iso(now())); } catch { return res.status(409).json({ error: 'An account with this email already exists' }); }
     features.applyReferral(Number(r.lastInsertRowid), req.body?.ref);
     promote(); startSession(res, Number(r.lastInsertRowid), req.body?.remember !== false);
     res.status(201).json({ user: publicUser(db.prepare('SELECT * FROM users WHERE id=?').get(r.lastInsertRowid)) });
   });
-  api.post('/auth/login', (req, res) => {
+  api.post('/auth/login', async (req, res) => {
     if (limited(req, res)) return;
     const { email, password } = req.body || {};
     promote();
     const u = db.prepare('SELECT * FROM users WHERE email=?').get(String(email || '').trim().toLowerCase());
     if (!u) { logLogin(req, null, false, email, 'no account'); return res.status(404).json({ error: 'No account found with this email. Create an account first.', code: 'NO_ACCOUNT' }); }
-    const ok = u && u.hash && crypto.timingSafeEqual(Buffer.from(hashPw(String(password || ''), u.salt), 'hex'), Buffer.from(u.hash, 'hex'));
+    const ok = u && u.hash && crypto.timingSafeEqual(Buffer.from(await hashPwAsync(String(password || ''), u.salt), 'hex'), Buffer.from(u.hash, 'hex'));
     if (!ok) { logLogin(req, u.id, false, u.email, 'wrong password'); return res.status(401).json({ error: 'Incorrect email or password' }); }
     if (u.status === 'suspended') return res.status(403).json({ error: 'This account has been suspended. Contact the administrator.', code: 'SUSPENDED' });
     startSession(res, u.id, req.body?.remember !== false);

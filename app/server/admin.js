@@ -770,7 +770,7 @@ export function adminRouter({ v24, tips, assign, exitFn, drafter = null, db, now
   qx = mountAdminExtras({ r, db, now, audit, bad, results, settings, notifier, features, runReminders, page });
   mountAlertCentre({ r, db, now, audit, bad, settings, notifier, mailer, whatsapp, jobs, recentErrors, qx, assign, exams, BUILTIN_ID, runBuild, bust });
   mountHelp({ r, db, now, audit, bad, jobs });
-  mountLoadTest({ r, db, now, audit, bad, settings, getMock, controls, jobs });
+  mountLoadTest({ r, db, now, audit, bad, settings, getMock, controls, jobs, hashPw });
   mountTeam({ r, db, now, audit, bad, jobs });
   mountAdministrators({ r, db, now, audit, bad, settings, notifier, jobs });
   v24.mountAdmin({ r, audit, bad });

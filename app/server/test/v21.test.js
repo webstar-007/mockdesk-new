@@ -172,7 +172,7 @@ test('help: every topic links only to pages that exist and related ids are real'
 test('load test v2: custom settings are clamped, results are saved, compared, labelled and pinned', async () => {
   const { parseCfg, compareOf, curveOf, limitOf, scorecardOf } = await import('../loadtest.js');
   const c = parseCfg({ users: 9999, durationSec: 1, pattern: 'weird', jitter: 500, errStopPct: 1, rampSec: 999, label: '  Before Sunday  ' });
-  assert.equal(c.users, 500); assert.equal(c.durationSec, 5); assert.equal(c.pattern, 'steady'); assert.equal(c.jitter, 80); assert.equal(c.errStopPct, 10); assert.equal(c.rampSec, 5); assert.equal(c.label, 'Before Sunday');
+  assert.equal(c.users, 1000); assert.equal(c.durationSec, 5); assert.equal(c.pattern, 'steady'); assert.equal(c.jitter, 80); assert.equal(c.errStopPct, 10); assert.equal(c.rampSec, 5); assert.equal(c.label, 'Before Sunday');
   assert.equal(parseCfg({ pattern: 'spike', durationSec: 60 }).rampSec, 1); assert.equal(parseCfg({ pattern: 'ramp', durationSec: 50 }).rampSec, 40);
   // the curve and the measured limit
   const smp = []; for (let t = 1; t <= 40; t++) smp.push({ phase: 'running', users: t * 5, rps: 10, p95: t < 25 ? 100 : 3000, errors: 0, cpuProc: t * 2 });
@@ -208,15 +208,50 @@ test('load test v2: custom settings are clamped, results are saved, compared, la
 test('load test v3: students can browse pages, extra browsers, custom pages, review and pdf', async () => {
   const { parseCfg, cleanCustom, PAGES } = await import('../loadtest.js');
   assert.deepEqual(cleanCustom([{ path: '/mocks', perMin: 99 }, { path: '/admin/users' }, { path: 'nope' }, { path: '/a/../b' }, { path: '/auth/logout' }, { path: '/mocks' }, { path: '/attempts/{attempt}/tips', perMin: 0 }]).map((x) => `${x.path}:${x.perMin}`), ['/mocks:60', '/attempts/{attempt}/tips:1']);
-  const c = parseCfg({ browsers: 9999, browsePerMin: -4, pages: ['me', 'bogus'], custom: [{ path: '/me' }] }); assert.equal(c.browsers, 500); assert.equal(c.browsePerMin, 0); assert.deepEqual(c.pages, ['me']); assert.equal(c.custom.length, 1);
+  const c = parseCfg({ browsers: 9999, browsePerMin: -4, pages: ['me', 'bogus'], custom: [{ path: '/me' }] }); assert.equal(c.browsers, 1000); assert.equal(c.browsePerMin, 0); assert.deepEqual(c.pages, ['me']); assert.equal(c.custom.length, 1);
   { const ctl = (await call('boss', 'GET', '/admin/controls')).body; const c = ctl.controls || ctl; await call('boss', 'PUT', '/admin/controls', { ...c, features: { ...c.features, tips: true } }); }
   const i = (await call('boss', 'GET', '/admin/loadtest')).body; assert.equal(i.pages.length, PAGES.length);
   const run = async (body) => { assert.equal((await call('boss', 'POST', '/admin/loadtest/start', { confirm: 'start', mockId: i.info.mocks[0].id, durationSec: 8, saveEverySec: 3, ...body })).status, 202); let g; for (let n = 0; n < 120; n++) { await new Promise((r) => setTimeout(r, 400)); g = (await call('boss', 'GET', '/admin/loadtest')).body; if (['done', 'failed'].includes(g.run?.phase)) break; } assert.equal(g.run.phase, 'done', g.run.error); return g.run.report; };
   const rep = await run({ users: 4, browsers: 3, browsePerMin: 30, browserPerMin: 30, pages: PAGES.map((x) => x[0]), custom: [{ path: '/attempts/{attempt}/tips', perMin: 30 }, { path: '/no/such/page', perMin: 30 }], reviewPct: 100, pdfPct: 100, resultPct: 100 });
   const keys = Object.keys(rep.kinds); assert.ok(keys.some((k) => k.startsWith('page:')), keys.join()); assert.ok(keys.some((k) => k.startsWith('custom:')));
-  assert.ok(rep.kinds.review?.n === 4 && rep.kinds.pdf?.n === 4, JSON.stringify(rep.errors)); assert.ok(rep.pages.n >= 6); assert.equal(rep.totals.coreErrorPct, 0, 'real exam and page actions never failed'); assert.ok(rep.totals.customErrors > 0 && rep.kinds['custom:/no/such/page'].errors > 0); assert.notEqual(rep.verdict.title, 'Overloaded'); assert.ok(rep.scorecard.some((r) => r.key === 'custom')); assert.ok(rep.plain.some((x) => /Your page \/no\/such\/page failed/.test(x)));
+  assert.ok(rep.kinds.review?.n === 16 && rep.kinds.pdf?.n === 4, JSON.stringify(rep.errors)); assert.ok(rep.pages.n >= 6); assert.equal(rep.totals.coreErrorPct, 0, 'real exam and page actions never failed'); assert.ok(rep.totals.customErrors > 0 && rep.kinds['custom:/no/such/page'].errors > 0); assert.notEqual(rep.verdict.title, 'Overloaded'); assert.ok(rep.scorecard.some((r) => r.key === 'custom')); assert.ok(rep.plain.some((x) => /Your page \/no\/such\/page failed/.test(x)));
   assert.ok(rep.scorecard.some((r) => r.key === 'pages')); assert.ok(rep.scorecard.some((r) => r.key === 'pdf')); assert.ok(rep.plain.some((p) => /extra students only browsed/.test(p)));
   assert.equal(rep.config.browsers, 3);
   assert.equal(db.prepare("SELECT COUNT(*) c FROM users WHERE email LIKE '%@loadtest.invalid'").get().c, 0, 'browser accounts removed too');
   await call('boss', 'DELETE', '/admin/loadtest/history');
+});
+
+test('load test v4: new settings are cleaned, preflight explains problems, targets and steps are reported', async () => {
+  const { parseCfg, cleanCustom, cleanTargets, targetsOf, stepsOf, PATTERNS } = await import('../loadtest.js');
+  assert.deepEqual(PATTERNS, ['steady', 'spike', 'ramp', 'steps', 'waves']);
+  const c = parseCfg({ users: 40, durationSec: 600, pattern: 'steps', stepCount: 99, warmupSec: 9999, homePerMin: 99, integrityPerMin: 5, sectionAtPct: 1, targets: { enabled: true, p95Ms: 1, errorPct: 99 } });
+  assert.equal(c.stepCount, 10); assert.equal(c.warmupSec, 60); assert.equal(c.rampSec, 480); assert.equal(c.homePerMin, 30); assert.equal(c.sectionAtPct, 10); assert.equal(c.targets.p95Ms, 50); assert.equal(c.targets.errorPct, 50); assert.equal(parseCfg({ pattern: 'waves', durationSec: 100 }).rampSec, 10);
+  assert.equal(parseCfg({ durationSec: 10, warmupSec: 50 }).warmupSec, 5, 'warm-up never longer than half the test');
+  const cu = cleanCustom([{ path: '/bookmarks', method: 'post', body: '{"a":1}' }, { path: '/me', method: 'POST' }, { path: '/attempts/{attempt}/integrity', method: 'POST', body: '{bad' }, { path: '/attempts/{attempt}/errors/{question}', method: 'PUT', body: '{"reason":"{question}"}' }, { path: '/bookmarks', method: 'GET' }, ...Array.from({ length: 20 }, (_, n) => ({ path: `/mocks?x=${n}` }))]);
+  assert.deepEqual(cu.slice(0, 3).map((x) => `${x.method} ${x.path}`), ['POST /bookmarks', 'PUT /attempts/{attempt}/errors/{question}', 'GET /bookmarks']); assert.equal(cu.length, 12);
+  const t = cleanTargets({ enabled: 1 }); assert.deepEqual([t.p95Ms, t.errorPct, t.cpuPct], [500, 1, 80]);
+  const rep = { config: { targets: { ...t, enabled: true } }, kinds: { save: { p95: 120 }, submit: { p95: 3000 } }, totals: { coreErrorPct: 0 }, peaks: { cpuProc: 40, memUsedPct: 50, writeMs: 10 }, stopped: '' };
+  const r = targetsOf(rep); assert.equal(r.pass, false); assert.equal(r.total, 6); assert.deepEqual(r.items.filter((x) => !x.pass).map((x) => x.key), ['submit']); assert.equal(targetsOf({ ...rep, config: { targets: { enabled: false } } }), null);
+  const smp = []; for (let tt = 0; tt < 20; tt++) smp.push({ t: tt, phase: 'running', users: tt < 10 ? 5 : 10, rps: 10, errors: 0, p95: tt < 10 ? 50 : 400, cpuProc: 20 });
+  const st = stepsOf(smp, { pattern: 'steps', rampSec: 10, stepCount: 2 }, 0); assert.equal(st.length, 2); assert.equal(st[0].users, 5); assert.equal(st[1].p95, 400); assert.deepEqual(stepsOf(smp, { pattern: 'steady' }, 0), []);
+  const i = (await call('boss', 'GET', '/admin/loadtest')).body; const mid = i.info.mocks[0].id;
+  const pf = (await call('boss', 'POST', '/admin/loadtest/preflight', { mockId: mid, users: 50, durationSec: 60, custom: [{ path: '/bookmarks', method: 'POST', body: '{}' }], sectionMoves: true })).body;
+  assert.equal(pf.ok, true, JSON.stringify(pf)); assert.ok(pf.est.requests > 100 && pf.est.rps > 0 && pf.est.snapshotKB > 0); assert.ok(pf.warnings.some((w) => /POST or PUT/.test(w)));
+  const long = (await call('boss', 'POST', '/admin/loadtest/preflight', { mockId: mid, users: 5, durationSec: 900 })).body; assert.equal(long.est.seconds, 915); assert.ok(long.warnings.some((w) => /Long tests/.test(w)));
+  assert.ok('run' in (await call('boss', 'GET', '/admin/loadtest/live')).body);
+  const sb = (await call('boss', 'POST', '/admin/loadtest/signin-bench', { count: 5 })).body; assert.equal(sb.count, 5); assert.ok(sb.sync.avgMs > 0 && sb.pool.perSec > 0 && sb.estimates.length === 5 && sb.advice);
+});
+
+test('load test v4: a staircase run with targets, warm-up, tab-switch reports and a custom write', async () => {
+  const i = (await call('boss', 'GET', '/admin/loadtest')).body;
+  const body = { confirm: 'start', mockId: i.info.mocks[0].id, users: 6, durationSec: 12, saveEverySec: 3, pattern: 'steps', stepCount: 3, warmupSec: 2, integrityPerMin: 30, homePerMin: 30, targets: { enabled: true, p95Ms: 5000, errorPct: 5 }, custom: [{ path: '/attempts/{attempt}/integrity', method: 'POST', body: '{"leaves":1}', perMin: 30 }] };
+  assert.equal((await call('boss', 'POST', '/admin/loadtest/start', body)).status, 202);
+  let g; for (let n = 0; n < 150; n++) { await new Promise((r) => setTimeout(r, 400)); g = (await call('boss', 'GET', '/admin/loadtest/live')).body; if (['done', 'failed'].includes(g.run?.phase)) break; }
+  assert.equal(g.run.phase, 'done', g.run.error); const rep = g.run.report;
+  assert.ok(rep.steps.length >= 2, JSON.stringify(rep.steps)); assert.ok(rep.steps[0].users <= rep.steps[rep.steps.length - 1].users);
+  assert.ok(rep.kinds.integrity?.n > 0 && rep.kinds['custom:POST /attempts/{attempt}/integrity']?.n > 0, Object.keys(rep.kinds).join());
+  assert.ok(rep.targets && rep.targets.total >= 5 && typeof rep.targets.pass === 'boolean'); assert.equal(rep.targets.pass, true, JSON.stringify(rep.targets));
+  assert.ok(rep.marks.some((m) => m.label === 'Step 2') && rep.marks.some((m) => m.label === 'Warm-up over'));
+  assert.ok(!rep.kinds.home, 'home page is not served in tests, so it is skipped'); assert.ok(rep.events.some((e) => /home page is not served/.test(e.text)));
+  assert.equal(rep.totals.coreErrorPct, 0); assert.ok(Array.isArray(rep.curve)); assert.equal(db.prepare("SELECT COUNT(*) c FROM users WHERE email LIKE '%@loadtest.invalid'").get().c, 0, 'everything removed');
 });
