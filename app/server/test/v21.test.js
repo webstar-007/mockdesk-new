@@ -171,8 +171,8 @@ test('help: every topic links only to pages that exist and related ids are real'
 
 test('load test v2: custom settings are clamped, results are saved, compared, labelled and pinned', async () => {
   const { parseCfg, compareOf, curveOf, limitOf, scorecardOf } = await import('../loadtest.js');
-  const c = parseCfg({ users: 9999, durationSec: 1, pattern: 'weird', jitter: 500, errStopPct: 1, rampSec: 999, label: '  Before Sunday  ' });
-  assert.equal(c.users, 1000); assert.equal(c.durationSec, 5); assert.equal(c.pattern, 'steady'); assert.equal(c.jitter, 80); assert.equal(c.errStopPct, 10); assert.equal(c.rampSec, 5); assert.equal(c.label, 'Before Sunday');
+  const c = parseCfg({ users: 99999, durationSec: 1, pattern: 'weird', jitter: 500, errStopPct: 1, rampSec: 999, label: '  Before Sunday  ' });
+  assert.equal(c.users, 10000); assert.equal(c.durationSec, 5); assert.equal(c.pattern, 'steady'); assert.equal(c.jitter, 80); assert.equal(c.errStopPct, 10); assert.equal(c.rampSec, 5); assert.equal(c.label, 'Before Sunday');
   assert.equal(parseCfg({ pattern: 'spike', durationSec: 60 }).rampSec, 1); assert.equal(parseCfg({ pattern: 'ramp', durationSec: 50 }).rampSec, 40);
   // the curve and the measured limit
   const smp = []; for (let t = 1; t <= 40; t++) smp.push({ phase: 'running', users: t * 5, rps: 10, p95: t < 25 ? 100 : 3000, errors: 0, cpuProc: t * 2 });
@@ -208,7 +208,7 @@ test('load test v2: custom settings are clamped, results are saved, compared, la
 test('load test v3: students can browse pages, extra browsers, custom pages, review and pdf', async () => {
   const { parseCfg, cleanCustom, PAGES } = await import('../loadtest.js');
   assert.deepEqual(cleanCustom([{ path: '/mocks', perMin: 99 }, { path: '/admin/users' }, { path: 'nope' }, { path: '/a/../b' }, { path: '/auth/logout' }, { path: '/mocks' }, { path: '/attempts/{attempt}/tips', perMin: 0 }]).map((x) => `${x.path}:${x.perMin}`), ['/mocks:60', '/attempts/{attempt}/tips:1']);
-  const c = parseCfg({ browsers: 9999, browsePerMin: -4, pages: ['me', 'bogus'], custom: [{ path: '/me' }] }); assert.equal(c.browsers, 1000); assert.equal(c.browsePerMin, 0); assert.deepEqual(c.pages, ['me']); assert.equal(c.custom.length, 1);
+  const c = parseCfg({ browsers: 99999, browsePerMin: -4, pages: ['me', 'bogus'], custom: [{ path: '/me' }] }); assert.equal(c.browsers, 10000); assert.equal(c.browsePerMin, 0); assert.deepEqual(c.pages, ['me']); assert.equal(c.custom.length, 1);
   { const ctl = (await call('boss', 'GET', '/admin/controls')).body; const c = ctl.controls || ctl; await call('boss', 'PUT', '/admin/controls', { ...c, features: { ...c.features, tips: true } }); }
   const i = (await call('boss', 'GET', '/admin/loadtest')).body; assert.equal(i.pages.length, PAGES.length);
   const run = async (body) => { assert.equal((await call('boss', 'POST', '/admin/loadtest/start', { confirm: 'start', mockId: i.info.mocks[0].id, durationSec: 8, saveEverySec: 3, ...body })).status, 202); let g; for (let n = 0; n < 120; n++) { await new Promise((r) => setTimeout(r, 400)); g = (await call('boss', 'GET', '/admin/loadtest')).body; if (['done', 'failed'].includes(g.run?.phase)) break; } assert.equal(g.run.phase, 'done', g.run.error); return g.run.report; };
@@ -225,7 +225,7 @@ test('load test v4: new settings are cleaned, preflight explains problems, targe
   const { parseCfg, cleanCustom, cleanTargets, targetsOf, stepsOf, PATTERNS } = await import('../loadtest.js');
   assert.deepEqual(PATTERNS, ['steady', 'spike', 'ramp', 'steps', 'waves']);
   const c = parseCfg({ users: 40, durationSec: 600, pattern: 'steps', stepCount: 99, warmupSec: 9999, homePerMin: 99, integrityPerMin: 5, sectionAtPct: 1, targets: { enabled: true, p95Ms: 1, errorPct: 99 } });
-  assert.equal(c.stepCount, 10); assert.equal(c.warmupSec, 60); assert.equal(c.rampSec, 480); assert.equal(c.homePerMin, 30); assert.equal(c.sectionAtPct, 10); assert.equal(c.targets.p95Ms, 50); assert.equal(c.targets.errorPct, 50); assert.equal(parseCfg({ pattern: 'waves', durationSec: 100 }).rampSec, 10);
+  assert.equal(c.stepCount, 10); assert.equal(c.warmupSec, 300); assert.equal(c.rampSec, 480); assert.equal(c.homePerMin, 60); assert.equal(c.sectionAtPct, 10); assert.equal(c.targets.p95Ms, 50); assert.equal(c.targets.errorPct, 50); assert.equal(parseCfg({ pattern: 'waves', durationSec: 100 }).rampSec, 10);
   assert.equal(parseCfg({ durationSec: 10, warmupSec: 50 }).warmupSec, 5, 'warm-up never longer than half the test');
   const cu = cleanCustom([{ path: '/bookmarks', method: 'post', body: '{"a":1}' }, { path: '/me', method: 'POST' }, { path: '/attempts/{attempt}/integrity', method: 'POST', body: '{bad' }, { path: '/attempts/{attempt}/errors/{question}', method: 'PUT', body: '{"reason":"{question}"}' }, { path: '/bookmarks', method: 'GET' }, ...Array.from({ length: 20 }, (_, n) => ({ path: `/mocks?x=${n}` }))]);
   assert.deepEqual(cu.slice(0, 3).map((x) => `${x.method} ${x.path}`), ['POST /bookmarks', 'PUT /attempts/{attempt}/errors/{question}', 'GET /bookmarks']); assert.equal(cu.length, 12);
@@ -254,4 +254,25 @@ test('load test v4: a staircase run with targets, warm-up, tab-switch reports an
   assert.ok(rep.marks.some((m) => m.label === 'Step 2') && rep.marks.some((m) => m.label === 'Warm-up over'));
   assert.ok(!rep.kinds.home, 'home page is not served in tests, so it is skipped'); assert.ok(rep.events.some((e) => /home page is not served/.test(e.text)));
   assert.equal(rep.totals.coreErrorPct, 0); assert.ok(Array.isArray(rep.curve)); assert.equal(db.prepare("SELECT COUNT(*) c FROM users WHERE email LIKE '%@loadtest.invalid'").get().c, 0, 'everything removed');
+});
+
+test('load test v5: limits are the admin\'s to change, 10000 is the ceiling, runs report live detail, export and baseline work', async () => {
+  const { parseCfg } = await import('../loadtest.js'); const i = (await call('boss', 'GET', '/admin/loadtest')).body; assert.equal(i.info.limits.users[1], 10000); assert.equal(i.info.ceil.users, 10000); assert.ok(i.info.real.students >= 1);
+  assert.equal((await call('s0', 'PUT', '/admin/loadtest/limits', { users: 50 })).status, 403);
+  let r = (await call('boss', 'PUT', '/admin/loadtest/limits', { users: 50, durationSec: 7200 })).body; assert.equal(r.limits.users, 50); assert.equal(r.limits.durationSec, 7200);
+  assert.equal(parseCfg({ users: 500, durationSec: 99999 }).users, 50); assert.equal(parseCfg({ users: 5, durationSec: 99999 }).durationSec, 7200);
+  r = (await call('boss', 'PUT', '/admin/loadtest/limits', { users: 99999, durationSec: 99999999, customMax: 500 })).body; assert.equal(r.limits.users, 10000, 'never above the ceiling'); assert.equal(r.limits.durationSec, 86400); assert.equal(r.limits.customMax, 40);
+  assert.equal((await call('boss', 'PUT', '/admin/loadtest/limits', { reset: true })).body.limits.users, 10000);
+  const pre = (await call('boss', 'POST', '/admin/loadtest/preflight', { users: 9000, mockId: i.info.mocks[0].id, durationSec: 60 })).body; assert.ok(pre.est.setupSec >= 0); assert.ok(pre.est.genMB > 400);
+  const st = await call('boss', 'POST', '/admin/loadtest/start', { users: 8, durationSec: 6, saveEverySec: 3, timeoutSec: 20, confirm: 'start', mockId: i.info.mocks[0].id }); assert.equal(st.status, 202, st.text);
+  let live = null; for (let n = 0; n < 40; n++) { await new Promise((x) => setTimeout(x, 300)); live = (await call('boss', 'GET', '/admin/loadtest/live')).body.run; if (live?.samples?.length > 3 && live.totals) break; }
+  assert.ok(live.totals.req >= 1); assert.ok('inflight' in live.samples[live.samples.length - 1]); assert.ok('p99' in live.samples[live.samples.length - 1]);
+  let g; for (let n = 0; n < 80; n++) { await new Promise((x) => setTimeout(x, 400)); g = (await call('boss', 'GET', '/admin/loadtest')).body; if (g.run?.phase === 'done' || g.run?.phase === 'failed') break; }
+  assert.equal(g.run.phase, 'done', JSON.stringify(g.run.error)); const rep = g.run.report; assert.equal(rep.config.timeoutSec, 20); assert.ok(g.run.events.some((e) => /active/.test(e.text)), 'milestones in the feed');
+  const csv = await call('boss', 'GET', `/admin/loadtest/report/${rep.id}/csv`); assert.equal(csv.status, 200); assert.match(csv.text.split('\n')[0], /^t,users,rps,p95,p99/); assert.ok(csv.text.split('\n').length >= 3);
+  assert.equal((await call('boss', 'PUT', '/admin/loadtest/baseline', { id: 'nope' })).status, 404);
+  assert.equal((await call('boss', 'PUT', '/admin/loadtest/baseline', { id: rep.id })).body.baselineId, rep.id);
+  assert.equal((await call('boss', 'GET', `/admin/loadtest/report/${rep.id}`)).body.vsBaseline, null, 'a report is not compared with itself');
+  assert.equal((await call('boss', 'GET', '/admin/loadtest')).body.baselineId, rep.id);
+  assert.equal((await call('boss', 'PUT', '/admin/loadtest/baseline', { id: '' })).body.baselineId, '');
 });

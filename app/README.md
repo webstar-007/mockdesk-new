@@ -76,3 +76,5 @@ Keys typed in the admin panel are stored encrypted in the database and are never
 | `content/` | the five starter mocks as JSON, copied into the database on the first start |
 | `data/` | created at run time: database, uploads, backups. Never commit it |
 | `docs/` | `ADMIN.md` (admin guide), `API.md` (routes), `CONTENT_GUIDE.md` (question file format) |
+
+**v28.** Load test up to 10,000 students with editable limits, scenario cards, richer live view and baseline comparison. See CHANGELOG.

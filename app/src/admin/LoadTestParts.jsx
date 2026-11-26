@@ -40,7 +40,8 @@ export function Charts({ s, cpus, marks }) {
     <div className="lt-charts">
       <Chart title="Students active" lines={one('users', 'var(--brand)')} marks={marks} note="How many virtual students were working at each moment." />
       <Chart title="Requests per second" lines={one('rps', 'var(--brand)')} marks={marks} />
-      <Chart title="Response time (95th percentile)" lines={one('p95', 'var(--bad)')} unit=" ms" marks={marks} note="95 out of 100 requests were faster than this." />
+      <Chart title="Response time" lines={[{ data: s, key: 'p95', color: 'var(--bad)', name: 'p95 (95 in 100 faster)' }, { data: s, key: 'p99', color: 'var(--warn)', name: 'p99 (slowest 1 in 100)', dash: '4 3' }]} unit=" ms" legend marks={marks} />
+      <Chart title="Requests waiting for an answer" lines={one('inflight', 'var(--warn)')} marks={marks} note="Climbs when the server cannot keep up and requests queue." />
       <Chart title="Failed requests" lines={one('errors', 'var(--bad)')} marks={marks} note="Requests that failed in each second." />
       <Chart title="CPU" lines={[{ data: s, key: 'cpuProc', color: 'var(--brand)', name: 'App' }, { data: s, key: 'cpuSys', color: 'var(--muted)', name: `Whole server (${cpus} cores)` }]} max={100} unit="%" legend marks={marks} note="App = share of one core (the app uses one core)." />
       <Chart title="Memory used (whole server)" lines={one('memUsedPct', 'var(--warn)')} max={100} unit="%" marks={marks} />
@@ -55,10 +56,20 @@ export function ScoreRing({ score, level }) {
   return (<svg className="lt-ring" viewBox="0 0 80 80" role="img" aria-label={`Health score ${score} out of 100`}><circle cx="40" cy="40" r="34" fill="none" stroke="var(--line)" strokeWidth="8" /><circle cx="40" cy="40" r="34" fill="none" stroke={col} strokeWidth="8" strokeLinecap="round" strokeDasharray={`${(score / 100) * c} ${c}`} transform="rotate(-90 40 40)" /><text x="40" y="45" textAnchor="middle" className="lt-ring-n">{score}</text></svg>);
 }
 
-export function Feed({ events }) {
-  if (!events?.length) return null;
-  return (<section className="card"><h3 style={{ marginTop: 0 }}>What happened</h3><ol className="lt-feed">{events.map((e, i) => <li key={i} className={`t-${e.level}`}><time>{Math.round(e.t)}s</time><span>{e.text}</span></li>)}</ol></section>);
+export function LiveFeed({ events, live }) {
+  const [f, setF] = useState('all'); const all = events || [];
+  const bad = all.filter((e) => e.level === 'bad' || e.level === 'warn').length; const good = all.filter((e) => e.level === 'good').length;
+  if (!all.length) return live ? <section className="card lx-feed"><h3>Live feed</h3><p className="muted small">Nothing yet. Milestones and problems appear here as they happen.</p></section> : null;
+  const show = all.filter((e) => f === 'all' || (f === 'bad' ? e.level === 'bad' || e.level === 'warn' : e.level === 'good' || e.level === 'ok'));
+  const list = (live ? [...show].reverse() : show).slice(0, 200);
+  return (
+    <section className="card lx-feed"><div className="lx-feed-h"><h3>{live ? 'Live feed' : 'What happened'}</h3>
+      <div className="lx-chips" role="group" aria-label="Filter events">{[['all', `All ${all.length}`], ['bad', `Problems ${bad}`], ['good', `Good ${good}`]].map(([k, l]) => <button key={k} type="button" className={f === k ? 'on' : ''} aria-pressed={f === k} onClick={() => setF(k)}>{l}</button>)}</div></div>
+      {list.length ? <ol className="lt-feed">{list.map((e, i) => <li key={i} className={`t-${e.level}`}><time>{Math.round(e.t)}s</time><span>{e.text}</span></li>)}</ol> : <p className="muted small">Nothing in this filter.</p>}
+    </section>
+  );
 }
+export const Feed = (p) => <LiveFeed {...p} />;
 
 /** Capacity curve for a "gradual climb" test: response time at each number of active students. */
 function Curve({ curve, limit }) {
@@ -131,7 +142,7 @@ function Planner({ rep }) {
 const csv = (rep) => { const keys = Object.keys(rep.samples[0] || {}); return [keys.join(','), ...rep.samples.map((x) => keys.map((k) => x[k] ?? '').join(','))].join('\n'); };
 const save = (name, text, type) => { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], { type })); a.download = name; a.click(); URL.revokeObjectURL(a.href); };
 
-export function Report({ rep, onAgain, onRerun, onCompare, onChanged, prevId }) {
+export function Report({ rep, onAgain, onRerun, onCompare, onChanged, prevId, baselineId, vs, onBaseline }) {
   const v = rep.verdict; const k = rep.kinds; const rows = kindOrder(Object.keys(k)).map((x) => [x, kindLabel(x)]);
   const stamp = new Date(rep.at).toISOString().slice(0, 16).replace(':', '-'); const [edit, setEdit] = useState(false); const [label, setLabel] = useState(rep.label || ''); const [note, setNote] = useState(rep.note || '');
   const patch = async (b) => { try { await api.put(`/admin/loadtest/report/${rep.id}`, b); onChanged?.(); } catch (e) { toast(e.message, 'bad'); } };
@@ -140,7 +151,7 @@ export function Report({ rep, onAgain, onRerun, onCompare, onChanged, prevId }) 
     <section>
       <div className={`card lt-verdict t-${TONE[v.level]}`}>
         <ScoreRing score={rep.score ?? 0} level={v.level} />
-        <div className="lt-vmain"><Badge tone={TONE[v.level]}>{v.title}</Badge>{rep.pinned && <Badge>Pinned</Badge>}
+        <div className="lt-vmain"><Badge tone={TONE[v.level]}>{v.title}</Badge>{rep.pinned && <Badge>Pinned</Badge>}{baselineId === rep.id && <Badge tone="good">Baseline</Badge>}
           <h2>{rep.label ? `${rep.label}: ` : ''}{rep.config.users} students for {rep.config.durationSec} seconds</h2>
           <p className="muted small" style={{ margin: '0 0 6px' }}>{dt(rep.at)} · {shapeName(rep.config.pattern)} · mock: {rep.server.mock}</p><p>{v.text}</p>
           {rep.stopped && <p className="small"><b>Stopped early:</b> {rep.stopReason}</p>}
@@ -153,10 +164,16 @@ export function Report({ rep, onAgain, onRerun, onCompare, onChanged, prevId }) 
         <div className="lt-actions">
           <button className="btn btn-primary" onClick={onAgain}>New test</button><button className="btn btn-ghost" onClick={() => onRerun(rep.config)}>Run again with the same settings</button>
           {prevId && <button className="btn btn-ghost" onClick={() => onCompare(prevId, rep.id)}>Compare with the test before</button>}
+          {baselineId !== rep.id && <button className="btn btn-ghost" onClick={() => onBaseline?.(rep.id)}>Use as baseline</button>}
           <button className="btn btn-ghost" onClick={() => setEdit(true)}>Name and note</button><button className="btn btn-ghost" onClick={() => patch({ pinned: !rep.pinned })}>{rep.pinned ? 'Unpin' : 'Pin (keep)'}</button>
           <button className="btn btn-ghost" onClick={() => save(`load-test-${stamp}.json`, JSON.stringify(rep, null, 2), 'application/json')}>Download report</button><button className="btn btn-ghost" onClick={() => save(`load-test-${stamp}.csv`, csv(rep), 'text/csv')}>Download CSV</button>
         </div>
       </div>
+
+      {vs && <section className={`card lx-vs t-${vs.worse > vs.better ? 'bad' : vs.better > vs.worse ? 'good' : 'warn'}`} style={{ marginTop: 12 }}>
+        <div className="lx-vs-h"><h3>Against your baseline</h3><span className="muted small">{vs.label || 'Baseline'} · {dt(vs.at)}</span>{onCompare && <button className="btn btn-ghost btn-sm" onClick={() => onCompare(vs.id, rep.id)}>Full comparison</button>}</div>
+        <p><b>{vs.headline}</b></p>{vs.caution && <p className="small muted">{vs.caution}</p>}
+        <ul className="lx-vs-l">{vs.rows.filter((r) => r.verdict !== 'same' && r.delta != null).slice(0, 6).map((r) => <li key={r.key} className={`c-${r.verdict}`}><span>{r.label}</span><b>{val(r.a, r.unit)} → {val(r.b, r.unit)}</b></li>)}</ul></section>}
 
       {rep.plain?.length > 0 && <section className="card" style={{ marginTop: 12 }}><h3 style={{ marginTop: 0 }}>In plain words</h3><ul className="lt-advice">{rep.plain.map((p, i) => <li key={i}>{p}</li>)}</ul></section>}
 
@@ -223,7 +240,7 @@ export function Compare({ a, b, cmp, onSwap, onBack }) {
   );
 }
 
-export function Results({ h, onOpen, onCompare, onChanged, onRerunId }) {
+export function Results({ h, onOpen, onCompare, onChanged, onRerunId, baselineId }) {
   const [sel, setSel] = useState([]); const toggle = (id) => setSel((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id].slice(-2)));
   const [busy, setBusy] = useState('');
   if (!h?.length) return <Empty>No saved tests yet. Run a test and the result is saved here so you can compare it with later ones.</Empty>;
@@ -239,7 +256,7 @@ export function Results({ h, onOpen, onCompare, onChanged, onRerunId }) {
       <div style={{ overflowX: 'auto' }}><table className="ad-table"><thead><tr><th><span className="sr-only">Compare</span></th><th>Test</th><th>Setup</th><th>Autosave p95</th><th>Failed</th><th>Peak CPU</th><th>Score</th><th>Result</th><th /></tr></thead>
         <tbody>{h.map((x) => <tr key={x.id}>
           <td><input type="checkbox" aria-label={`Select ${title(x)} to compare`} checked={sel.includes(x.id)} disabled={!x.hasReport} onChange={() => toggle(x.id)} /></td>
-          <td>{x.hasReport ? <button className="sx-link" onClick={() => onOpen(x.id)}>{x.label || 'Untitled test'}</button> : <span>{x.label || 'Older test'}</span>}{x.pinned && <> <Badge>Pinned</Badge></>}<div className="muted small">{dt(x.at)}</div></td>
+          <td>{x.hasReport ? <button className="sx-link" onClick={() => onOpen(x.id)}>{x.label || 'Untitled test'}</button> : <span>{x.label || 'Older test'}</span>}{x.pinned && <> <Badge>Pinned</Badge></>}{baselineId === x.id && <> <Badge tone="good">Baseline</Badge></>}<div className="muted small">{dt(x.at)}</div></td>
           <td>{x.users} for {x.durationSec}s<div className="muted small">{shapeName(x.pattern)}</div></td><td>{ms(x.p95)}</td><td>{x.errorPct}%</td><td>{x.peakCpu}%</td><td>{x.score ?? '–'}</td>
           <td><Badge tone={TONE[x.level]}>{x.title}{x.stopped ? ' (stopped)' : ''}</Badge>{x.targets && <div className={`small ${x.targets.pass ? '' : 'sx-bad'}`}>{x.targets.pass ? '✓ Targets met' : `✗ ${x.targets.total - x.targets.passed} target${x.targets.total - x.targets.passed > 1 ? 's' : ''} missed`}</div>}</td>
           <td className="lt-row-act">{x.hasReport ? <><button className="btn btn-ghost btn-sm" onClick={() => onOpen(x.id)}>Open</button><button className="btn btn-ghost btn-sm" disabled={busy === x.id} onClick={() => act(() => api.put(`/admin/loadtest/report/${x.id}`, { pinned: !x.pinned }), x.id)}>{x.pinned ? 'Unpin' : 'Pin'}</button><button className="btn btn-ghost btn-sm" onClick={() => onRerunId(x.id)}>Run again</button></> : <span className="muted small">Summary only</span>}

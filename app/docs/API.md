@@ -157,3 +157,5 @@ Load test additions: `GET /admin/loadtest/report/:id`, `PUT /admin/loadtest/repo
 Load test v25: `POST /admin/loadtest/preflight` (same body as start; returns `blockers`, `warnings`, `est`), `GET /admin/loadtest/live` (light poll of the running test), `POST /admin/loadtest/signin-bench` (`count`). `start` also accepts `pattern` steps|waves, `stepCount`, `warmupSec`, `integrityPerMin`, `homePerMin`, `sectionMoves`, `sectionAtPct`, `targets`, and custom requests with `method`/`body`.
 
 Help v26: `POST /admin/help/ask` now also returns `data` (`kind` profile|list|stats, `title`, `summary`, `stats`, `table`, `go`, `follow`) for data questions; `GET /admin/help/suggest?q=` returns type-ahead items.
+
+Load test v28: `GET/PUT /admin/loadtest/limits` (PUT `{reset:true}` restores defaults; 409 while a test runs), `PUT /admin/loadtest/baseline {id}`, `GET /admin/loadtest/report/:id/csv`. `GET /admin/loadtest/report/:id` returns `{report, baselineId, vsBaseline}`; `GET /admin/loadtest` includes `baselineId` and `info.ceil`, `info.real`; `/live` adds `totals`, `errors`, `setupPct`. Config gains `timeoutSec`.

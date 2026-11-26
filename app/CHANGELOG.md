@@ -1,5 +1,13 @@
 # What's new in MockDesk
 
+## v28: Load test, up to 10,000 students
+**Clean setup.** One page in four steps: pick a scenario card, set size and length, switch on what students do (settings appear under each switch), set pass/fail targets. Timing, safety stop and notes sit under Advanced. A bar at the bottom shows the size, estimated requests and any blockers.
+**Scenarios.** Ten ready-made cards (quick check, normal class, live exam start, submit rush, find my limit, staircase, two batches, busy site, soak, biggest possible) plus cards sized from your real data: all your students, and your biggest batch.
+**Your limits.** Most students, longest test, warm-up, staircase steps and custom requests are no longer fixed. Change them under Limits (ceiling 10,000 students, 24 hours). Requests can also give up after your own timeout.
+**Live view.** Students active, requests per second, p95 and p99, failures and requests waiting, resource meters, charts with p99 and in-flight, a live feed with milestones, new error types, recoveries and warnings (filter All, Problems, Good), and a failures-by-type list. Setup of large tests shows progress.
+**Big tests.** Users are created in slices, latency samples are capped so memory stays flat, and the preflight now checks generator memory, open-file limit and setup time.
+**Baseline.** Mark any saved result as your baseline. Every later result shows a banner comparing it with the baseline. Reports also download as CSV from the server.
+
 ## v27: Full-platform QA sweep
 Checked every admin, teacher, student and sign-in page on desktop, phone and dark mode.
 **Fixed.** Mock cards showed blank section bars ("0/"); the Audit log's When column wrapped into six lines and long details ran off the table; the Server tools checks list put each dot on its own line; the Support inbox filter chips were clipped ("Al"); form fields with hints sat out of line with their neighbours (batch invite, Topper tricks); the Exams page repeated the same "edit config" line twice; teacher Doubts and Batch health pages had the wrong breadcrumb ("Batch"); the admin search box showed a garbled letter on phones; Help was indented differently from other admin pages; the Administrators filter row wrapped awkwardly.

@@ -211,3 +211,6 @@ Setup now has a live preflight (blockers stop Start, warnings are advice), pass/
 
 ## v26: Help
 Help is one search box. Ask about people (by name or email), lists (top, lowest, inactive, new, online), teachers and batches, mocks, tests finished in a period, tickets, reports, sign-ins and admin activity. Tables sort, filter, copy and export to CSV. Questions starting with how/where/what is go to the step-by-step guides.
+
+## v28: Load test, up to 10,000 students
+Setup is four steps (scenario, size and length, what students do, pass/fail targets) with Advanced collapsed. **Limits** (top right) sets the largest students, length, warm-up, steps and custom requests the form accepts; the ceiling is 10,000 students and 24 hours. Scenario cards include ones sized from your real students and biggest batch. The live view shows p95/p99, failures, requests waiting, meters, charts and a filterable feed. In Saved results or a report choose **Use as baseline**; later reports show how they compare with it.

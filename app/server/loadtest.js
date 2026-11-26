@@ -11,7 +11,20 @@ import { owned } from './lib/userdata.js';
 
 const SIM = '%@loadtest.invalid';
 const HIDDEN = '__loadtest__';
-export const LIMITS = { users: [1, 1000], durationSec: [5, 900], saveEverySec: [3, 60], progress: [0, 90], rampSec: [0, 120], jitter: [0, 80], saveSize: [1, 10], resultPct: [0, 100], pollPct: [0, 100], markPct: [0, 50], submitSpreadPct: [5, 100], errStopPct: [10, 90], browsers: [0, 1000], browsePerMin: [0, 30], browserPerMin: [1, 30], reviewPct: [0, 100], pdfPct: [0, 100], warmupSec: [0, 60], stepCount: [2, 10], integrityPerMin: [0, 30], homePerMin: [0, 30], sectionAtPct: [10, 90], customMax: 12 };
+/** Hard ceilings: the most any limit can be raised to. The limits inside them are the admin's to change (Limits panel). */
+export const CEIL = { users: 10000, browsers: 10000, durationSec: 86400, warmupSec: 3600, stepCount: 20, customMax: 40 };
+export const LIMIT_DEFAULTS = { users: 10000, browsers: 10000, durationSec: 3600, warmupSec: 300, stepCount: 10, customMax: 12 };
+export const LIMITS = { users: [1, 10000], durationSec: [5, 3600], saveEverySec: [3, 600], progress: [0, 90], rampSec: [0, 3600], jitter: [0, 80], saveSize: [1, 10], resultPct: [0, 100], pollPct: [0, 100], markPct: [0, 50], submitSpreadPct: [5, 100], errStopPct: [10, 90], browsers: [0, 10000], browsePerMin: [0, 60], browserPerMin: [1, 60], reviewPct: [0, 100], pdfPct: [0, 100], warmupSec: [0, 300], stepCount: [2, 10], integrityPerMin: [0, 60], homePerMin: [0, 60], sectionAtPct: [10, 90], timeoutSec: [2, 120], customMax: 12 };
+const LOW = { users: 1, browsers: 1, durationSec: 5, warmupSec: 0, stepCount: 2, customMax: 1 };
+/** Set the admin's own maximums (students, length, ...) inside the hard ceilings. Returns the limits now in force. */
+export function applyLimits(raw = {}) {
+  for (const k of Object.keys(LIMIT_DEFAULTS)) {
+    const n = Math.round(Number(raw?.[k])); const v = Number.isFinite(n) ? Math.min(CEIL[k], Math.max(LOW[k], n)) : LIMIT_DEFAULTS[k];
+    if (k === 'customMax') LIMITS.customMax = v; else LIMITS[k] = [k === 'browsers' || k === 'warmupSec' ? 0 : LOW[k], v];
+  }
+  return limitsNow();
+}
+export const limitsNow = () => Object.fromEntries(Object.keys(LIMIT_DEFAULTS).map((k) => [k, k === 'customMax' ? LIMITS.customMax : LIMITS[k][1]]));
 /** Pages a signed-in student opens on their own: [key, label, path]. All are read-only. */
 export const PAGES = [['me', 'Profile', '/me'], ['mocks', 'Mock list', '/mocks'], ['announcements', 'Announcements', '/announcements'], ['inbox', 'Inbox', '/inbox'], ['assignments', 'Assignments', '/my/assignments'], ['practice', 'Practice overview', '/practice/overview'], ['stats', 'My stats', '/stats'], ['notebook', 'Notebook', '/notebook'], ['bookmarks', 'Bookmarks', '/bookmarks/ids'], ['errors', 'Error log summary', '/errors/summary'], ['batches', 'My batches', '/my/batches'], ['support', 'Support tickets', '/support'], ['referral', 'Referral', '/referral'], ['config', 'Site settings', '/config']];
 const PAGE_KEYS = PAGES.map((x) => x[0]); const DEFAULT_PAGES = ['me', 'mocks', 'announcements', 'inbox', 'assignments', 'practice', 'stats'];
@@ -62,7 +75,7 @@ export function stepsOf(samples, cfg, startT) {
   return out;
 }
 export const PATTERNS = ['steady', 'spike', 'ramp', 'steps', 'waves'];
-export const DEFAULTS = { users: 100, durationSec: 60, saveEverySec: 10, progress: 40, submitAtEnd: true, pattern: 'steady', rampSec: null, jitter: 20, saveSize: 3, resultPct: 70, pollPct: 20, markPct: 10, submitSpreadPct: 18, errStopPct: 40, label: '', mockId: '', browsers: 0, browsePerMin: 0, browserPerMin: 6, reviewPct: 0, pdfPct: 0, pages: DEFAULT_PAGES, custom: [], warmupSec: 0, stepCount: 4, integrityPerMin: 0, homePerMin: 0, sectionMoves: false, sectionAtPct: 50, targets: T_DEFAULTS };
+export const DEFAULTS = { users: 100, durationSec: 60, saveEverySec: 10, progress: 40, submitAtEnd: true, pattern: 'steady', rampSec: null, jitter: 20, saveSize: 3, resultPct: 70, pollPct: 20, markPct: 10, submitSpreadPct: 18, errStopPct: 40, label: '', mockId: '', browsers: 0, browsePerMin: 0, browserPerMin: 6, reviewPct: 0, pdfPct: 0, pages: DEFAULT_PAGES, custom: [], warmupSec: 0, stepCount: 4, integrityPerMin: 0, homePerMin: 0, sectionMoves: false, sectionAtPct: 50, timeoutSec: 30, targets: T_DEFAULTS };
 /** Turn whatever the browser sent into a safe, complete test configuration. */
 export function parseCfg(b = {}) {
   const pattern = PATTERNS.includes(b.pattern) ? b.pattern : 'steady'; const durationSec = clamp(b.durationSec, LIMITS.durationSec, 60);
@@ -71,7 +84,7 @@ export function parseCfg(b = {}) {
   return { users: clamp(b.users, LIMITS.users, 100), durationSec, saveEverySec: clamp(b.saveEverySec, LIMITS.saveEverySec, 10), progress: clamp(b.progress, LIMITS.progress, 40), submitAtEnd: b.submitAtEnd !== false, mockId: String(b.mockId || ''),
     pattern, rampSec: hasRamp ? Math.min(durationSec, clamp(b.rampSec, LIMITS.rampSec, auto)) : auto, jitter: clamp(b.jitter, LIMITS.jitter, 20), saveSize: clamp(b.saveSize, LIMITS.saveSize, 3), resultPct: clamp(b.resultPct, LIMITS.resultPct, 70), pollPct: clamp(b.pollPct, LIMITS.pollPct, 20),
     markPct: clamp(b.markPct, LIMITS.markPct, 10), submitSpreadPct: clamp(b.submitSpreadPct, LIMITS.submitSpreadPct, 18), errStopPct: clamp(b.errStopPct, LIMITS.errStopPct, 40), browsers: clamp(b.browsers, LIMITS.browsers, 0), browsePerMin: clamp(b.browsePerMin, LIMITS.browsePerMin, 0), browserPerMin: clamp(b.browserPerMin, LIMITS.browserPerMin, 6), reviewPct: clamp(b.reviewPct, LIMITS.reviewPct, 0), pdfPct: clamp(b.pdfPct, LIMITS.pdfPct, 0),
-    warmupSec: Math.min(Math.floor(durationSec / 2), clamp(b.warmupSec, LIMITS.warmupSec, 0)), stepCount: clamp(b.stepCount, LIMITS.stepCount, 4), integrityPerMin: clamp(b.integrityPerMin, LIMITS.integrityPerMin, 0), homePerMin: clamp(b.homePerMin, LIMITS.homePerMin, 0), sectionMoves: b.sectionMoves === true, sectionAtPct: clamp(b.sectionAtPct, LIMITS.sectionAtPct, 50), targets: cleanTargets(b.targets),
+    warmupSec: Math.min(Math.floor(durationSec / 2), clamp(b.warmupSec, LIMITS.warmupSec, 0)), stepCount: clamp(b.stepCount, LIMITS.stepCount, 4), integrityPerMin: clamp(b.integrityPerMin, LIMITS.integrityPerMin, 0), homePerMin: clamp(b.homePerMin, LIMITS.homePerMin, 0), sectionMoves: b.sectionMoves === true, sectionAtPct: clamp(b.sectionAtPct, LIMITS.sectionAtPct, 50), timeoutSec: clamp(b.timeoutSec, LIMITS.timeoutSec, 30), targets: cleanTargets(b.targets),
     pages: Array.isArray(b.pages) ? PAGE_KEYS.filter((k) => b.pages.includes(k)) : DEFAULT_PAGES, custom: cleanCustom(b.custom), label: String(b.label || '').trim().slice(0, 60) };
 }
 const clamp = (v, [lo, hi], d) => { const n = Number(v); return Number.isFinite(n) ? Math.min(hi, Math.max(lo, Math.round(n))) : d; };
@@ -167,7 +180,7 @@ export function plainOf(rep) {
   if (rep.measuredLimit) a.push(rep.measuredLimit.users > 0 ? `Measured limit: response times stayed healthy up to ${rep.measuredLimit.users} students${rep.measuredLimit.atLeast ? ' (the highest tested, so the real limit is higher)' : ''}.` : 'It struggled even at the first step, so the limit is below the smallest group tested.');
   return a;
 }
-const KEYS = ['t', 'rps', 'p95', 'errors', 'users', 'cpuProc', 'cpuSys', 'memUsedPct', 'rss', 'writeMs', 'lagMs', 'diskUsedPct'];
+const KEYS = ['t', 'rps', 'p95', 'p99', 'inflight', 'errors', 'users', 'cpuProc', 'cpuSys', 'memUsedPct', 'rss', 'writeMs', 'lagMs', 'diskUsedPct'];
 export function downsample(samples, max = 90) {
   const pick = samples.length <= max ? samples : samples.filter((_, i) => i % Math.ceil(samples.length / max) === 0 || i === samples.length - 1);
   return pick.map((x) => Object.fromEntries(KEYS.map((k) => [k, x[k]])));
@@ -237,26 +250,28 @@ export function mountLoadTest({ r, db, now, audit, bad, settings, getMock, contr
   const mockOptions = () => { if (now() - mocksCache.at < 30000) return mocksCache.v; const v = mockOptionsRaw(); mocksCache = { at: now(), v }; return v; };
   const mockOptionsRaw = () => db.prepare("SELECT id, name, status FROM mocks WHERE id NOT IN ('practice','pool') AND id!=? ORDER BY (status='published') DESC, number, created_at").all(HIDDEN).map((m) => { const g = getMock(m.id); return g && g.questions.length >= 10 ? { id: m.id, name: m.name, questions: g.questions.length } : null; }).filter(Boolean);
 
+  const realFacts = () => { try { const students = db.prepare(`SELECT COUNT(*) c FROM users WHERE COALESCE(role,'student')='student' AND email NOT LIKE '${SIM}'`).get().c; const batches = db.prepare(`SELECT b.name, COUNT(bm.user_id) n FROM batches b LEFT JOIN batch_members bm ON bm.batch_id=b.id WHERE COALESCE(b.archived,0)=0 GROUP BY b.id ORDER BY n DESC LIMIT 4`).all(); return { students, batches }; } catch { return { students: 0, batches: [] }; } };
+  const openFiles = () => { try { const m = fs.readFileSync('/proc/self/limits', 'utf8').match(/Max open files\s+(\d+|unlimited)/); return m ? (m[1] === 'unlimited' ? Infinity : Number(m[1])) : null; } catch { return null; } };
   function info() {
     const f = file(); const d = f ? diskOf(f) : null; const m = memInfo();
     const active = db.prepare(`SELECT COUNT(*) c FROM users WHERE COALESCE(role,'student')='student' AND last_seen>? AND email NOT LIKE '${SIM}'`).get(now() - 5 * 60000).c;
     const inTest = db.prepare("SELECT COUNT(*) c FROM attempts WHERE status='in_progress' AND mock_id!=?").get(HIDDEN).c;
-    return { cpus: os.cpus().length, cpuModel: os.cpus()[0]?.model || '', totalMem: m.total, availMem: m.avail, disk: d, dbBytes: sizeOf(f), activeStudents: active, inTest, maintenance: controls().maintenance.mode, mocks: mockOptions(), limits: LIMITS, node: process.version, platform: `${os.type()} ${os.release()}` };
+    return { cpus: os.cpus().length, cpuModel: os.cpus()[0]?.model || '', totalMem: m.total, availMem: m.avail, disk: d, dbBytes: sizeOf(f), activeStudents: active, inTest, maintenance: controls().maintenance.mode, mocks: mockOptions(), limits: LIMITS, ceil: CEIL, limitDefaults: LIMIT_DEFAULTS, real: realFacts(), node: process.version, platform: `${os.type()} ${os.release()}` };
   }
 
   // ---- the run ----
   async function execute(run, base) {
     const { cfg } = run; const T0 = performance.now(); const lag = monitorEventLoopDelay({ resolution: 10 }); lag.enable();
-    const kinds = {}; const win = { n: 0, err: 0, lat: [] }; let recent = []; const samples = []; const errors = {}; let busy = 0; let warmUntil = 0; const peaks = { cpuProc: 0, cpuSys: 0, rss: 0, heap: 0, memUsedPct: 0, diskUsedPct: 0, writeMs: 0, lagMs: 0, rps: 0 };
+    const CAP = 20000; const tot = { req: 0, err: 0, peakRps: 0 }; let inflight = 0; const kinds = {}; const win = { n: 0, err: 0, lat: [] }; let recent = []; const samples = []; const errors = {}; let busy = 0; let warmUntil = 0; const peaks = { cpuProc: 0, cpuSys: 0, rss: 0, heap: 0, memUsedPct: 0, diskUsedPct: 0, writeMs: 0, lagMs: 0, rps: 0 };
     const record = (kind, ms, status, text) => {
-      const warm = performance.now() < warmUntil; const k = (kinds[kind] ||= { lat: [], n: 0, err: 0 }); if (!warm) { k.n++; k.lat.push(ms); } win.n++; win.lat.push(ms);
-      const bad_ = status < 200 || status >= 400; if (bad_) { win.err++; if (!warm) { k.err++; const key = status === -1 ? 'timeout' : status === -2 ? 'connection failed' : String(status); errors[key] = (errors[key] || 0) + 1; if (/locked|busy/i.test(text || '')) busy++; } }
+      const warm = performance.now() < warmUntil; const k = (kinds[kind] ||= { lat: [], n: 0, err: 0 }); if (!warm) { k.n++; if (k.lat.length < CAP) k.lat.push(ms); else { const j = Math.floor(Math.random() * k.n); if (j < CAP) k.lat[j] = ms; } } win.n++; win.lat.push(ms); tot.req++;
+      const bad_ = status < 200 || status >= 400; if (bad_) { win.err++; tot.err++; if (!warm) { k.err++; const key = status === -1 ? 'timeout' : status === -2 ? 'connection failed' : String(status); errors[key] = (errors[key] || 0) + 1; if (/locked|busy/i.test(text || '')) busy++; } }
       recent.push(bad_ ? 1 : 0); if (recent.length > 60) recent.shift();
     };
     const hit = async (kind, method, url, sid, body, raw = false) => {
-      const t0 = performance.now(); let status = 0, text = '';
-      try { const rs = await fetch(`${base}${raw ? '' : '/api'}${url}`, { method, headers: { cookie: `sid=${sid}`, 'content-type': 'application/json' }, body: body ? JSON.stringify(body) : undefined, signal: AbortSignal.timeout(30000) }); status = rs.status; if (status >= 400) text = (await rs.text()).slice(0, 200); else await rs.arrayBuffer(); }
-      catch (e) { status = e?.name === 'TimeoutError' ? -1 : -2; }
+      const t0 = performance.now(); let status = 0, text = ''; inflight++;
+      try { const rs = await fetch(`${base}${raw ? '' : '/api'}${url}`, { method, headers: { cookie: `sid=${sid}`, 'content-type': 'application/json' }, body: body ? JSON.stringify(body) : undefined, signal: AbortSignal.timeout(cfg.timeoutSec * 1000) }); status = rs.status; if (status >= 400) text = (await rs.text()).slice(0, 200); else await rs.arrayBuffer(); }
+      catch (e) { status = e?.name === 'TimeoutError' ? -1 : -2; } finally { inflight--; }
       record(kind, performance.now() - t0, status, text); return status;
     };
     let stop = ''; const abort = (why) => { if (!stop) stop = why; };
@@ -277,29 +292,31 @@ export function mountLoadTest({ r, db, now, audit, bad, settings, getMock, contr
     db.prepare("INSERT OR REPLACE INTO mocks(id,number,name,difficulty,description,status,tags,source,created_at,updated_at) VALUES (?,?,?,?,?,'draft','[]','admin',?,?)").run(HIDDEN, 9999, 'Load test (temporary)', m.meta.difficulty || 'moderate', 'Created by the load simulator. Removed automatically.', t, t);
     db.exec('CREATE TABLE IF NOT EXISTS loadtest_probe(id INTEGER PRIMARY KEY, at INTEGER)');
     const students = []; const runId = crypto.randomBytes(3).toString('hex');
-    db.exec('BEGIN');
-    try {
-      const insU = db.prepare('INSERT INTO users(name,email,salt,hash,created_at,last_seen) VALUES (?,?,?,?,?,?)'); const insS = db.prepare('INSERT INTO sessions(id,user_id,expires_at,ip,ua,created_at) VALUES (?,?,?,?,?,?)');
-      const insA = db.prepare("INSERT INTO attempts(id,user_id,mock_id,status,segment_index,segment_started_at,started_at,snapshot,responses) VALUES (?,?,?,'in_progress',?,?,?,?,?)");
-      for (let i = 0; i < cfg.users; i++) {
-        const uid = Number(insU.run(`Virtual student ${i + 1}`, `lt-${runId}-${i}@loadtest.invalid`, 'x', 'x', new Date(t).toISOString(), t).lastInsertRowid);
-        const sid = crypto.randomBytes(32).toString('hex'); insS.run(sid, uid, t + 3600000, '127.0.0.1', 'loadtest', t);
-        const resp = {}; for (const q of segQs) if (Math.random() * 100 < cfg.progress) resp[q.id] = { selected: Math.floor(Math.random() * 4), marked: false, visited: true, timeMs: 15000 + Math.floor(Math.random() * 60000) };
-        const aid = crypto.randomUUID(); insA.run(aid, uid, HIDDEN, segIdx, t - elapsed, t - elapsed, snapshot, JSON.stringify(resp));
-        students.push({ uid, sid, aid, done: Object.keys(resp).length });
-      }
-      for (let i = 0; i < cfg.browsers; i++) {
-        const uid = Number(insU.run(`Virtual browser ${i + 1}`, `lt-${runId}-b${i}@loadtest.invalid`, 'x', 'x', new Date(t).toISOString(), t).lastInsertRowid);
-        const sid = crypto.randomBytes(32).toString('hex'); insS.run(sid, uid, t + 3600000, '127.0.0.1', 'loadtest', t); students.push({ uid, sid, aid: null, browser: true });
-      }
-      db.exec('COMMIT');
-    } catch (e) { db.exec('ROLLBACK'); throw e; }
+    const insU = db.prepare('INSERT INTO users(name,email,salt,hash,created_at,last_seen) VALUES (?,?,?,?,?,?)'); const insS = db.prepare('INSERT INTO sessions(id,user_id,expires_at,ip,ua,created_at) VALUES (?,?,?,?,?,?)');
+    const insA = db.prepare("INSERT INTO attempts(id,user_id,mock_id,status,segment_index,segment_started_at,started_at,snapshot,responses) VALUES (?,?,?,'in_progress',?,?,?,?,?)");
+    const mkUser = (i, browser) => {
+      const uid = Number(insU.run(browser ? `Virtual browser ${i + 1}` : `Virtual student ${i + 1}`, `lt-${runId}-${browser ? 'b' : ''}${i}@loadtest.invalid`, 'x', 'x', new Date(t).toISOString(), t).lastInsertRowid);
+      const sid = crypto.randomBytes(32).toString('hex'); insS.run(sid, uid, t + 3600000, '127.0.0.1', 'loadtest', t);
+      if (browser) { students.push({ uid, sid, aid: null, browser: true }); return; }
+      const resp = {}; for (const q of segQs) if (Math.random() * 100 < cfg.progress) resp[q.id] = { selected: Math.floor(Math.random() * 4), marked: false, visited: true, timeMs: 15000 + Math.floor(Math.random() * 60000) };
+      const aid = crypto.randomUUID(); insA.run(aid, uid, HIDDEN, segIdx, t - elapsed, t - elapsed, snapshot, JSON.stringify(resp)); students.push({ uid, sid, aid, done: Object.keys(resp).length });
+    };
+    // in slices, so the site stays responsive while thousands of accounts are created, and so Stop works during setup
+    const total = cfg.users + cfg.browsers; const SLICE = Math.max(25, Math.min(400, Math.floor(40000 / Math.max(10, run.snapshotKB))));
+    let made = 0; const setupT0 = performance.now();
+    while (made < total) {
+      if (stop) throw new Error('You stopped the test during setup.');
+      db.exec('BEGIN');
+      try { for (let n = 0; n < SLICE && made < total; n++, made++) { if (made < cfg.users) mkUser(made, false); else mkUser(made - cfg.users, true); } db.exec('COMMIT'); } catch (e) { try { db.exec('ROLLBACK'); } catch { /* */ } throw e; }
+      run.note = `Creating virtual students: ${made.toLocaleString()} of ${total.toLocaleString()}`; run.setupPct = Math.round((made / total) * 100); await sleep(0);
+    }
+    run.setupSec = r1((performance.now() - setupT0) / 1000);
     const dbBefore = sizeOf(file()) + sizeOf(`${file()}-wal`);
 
     // 2. samplers: once a second, resources and the rolling latency
     const probeDel = () => { try { db.prepare('DELETE FROM loadtest_probe').run(); } catch { /* */ } };
     const flags = {}; run.events = []; run.marks = []; run.events.push({ t: 0, text: `Test started: ${cfg.users} students for ${cfg.durationSec} seconds.`, level: 'info' });
-    let lastCpu = process.cpuUsage(), lastAt = performance.now(), lastSys = cpuTimes(); const cores = os.cpus().length; let lagStrikes = 0;
+    let recov = 0, peakEv = 0, lastPeakAt = -99; let lastCpu = process.cpuUsage(), lastAt = performance.now(), lastSys = cpuTimes(); const cores = os.cpus().length; let lagStrikes = 0;
     const tick = () => {
       const tt = (performance.now() - T0) / 1000; const c = process.cpuUsage(), at = performance.now(); const wall = Math.max(1, at - lastAt);
       const cpuProc = ((c.user - lastCpu.user + (c.system - lastCpu.system)) / 1000 / wall) * 100; lastCpu = c; lastAt = at; // percent of ONE core
@@ -307,7 +324,8 @@ export function mountLoadTest({ r, db, now, audit, bad, settings, getMock, contr
       const mem = memInfo(); const mu = process.memoryUsage(); const dsk2 = file() ? diskOf(file()) : null;
       let writeMs = 0; try { const w0 = performance.now(); db.exec('BEGIN IMMEDIATE'); db.prepare('INSERT INTO loadtest_probe(at) VALUES (?)').run(Date.now()); db.exec('COMMIT'); writeMs = performance.now() - w0; if (Math.random() < 0.2) probeDel(); } catch { try { db.exec('ROLLBACK'); } catch { /* */ } }
       const sorted = win.lat.slice().sort((a, b) => a - b); const lagMs = lag.percentile(99) / 1e6; lag.reset();
-      const win0 = win.n; const s = { t: r1(tt), rps: win.n, p50: r1(pct(sorted, 50)), p95: r1(pct(sorted, 95)), errors: win.err, users: run.active, cpuProc: r1(cpuProc), cpuSys: r1(cpuSys), rss: mu.rss, heap: mu.heapUsed, memUsedPct: r1(((mem.total - mem.avail) / mem.total) * 100), memAvail: mem.avail, diskUsedPct: dsk2?.usedPct ?? null, dbBytes: sizeOf(file()) + sizeOf(`${file()}-wal`), writeMs: r1(writeMs), lagMs: r1(lagMs), phase: run.phase };
+      const win0 = win.n; const s = { t: r1(tt), rps: win.n, p50: r1(pct(sorted, 50)), p95: r1(pct(sorted, 95)), errors: win.err, users: run.active, cpuProc: r1(cpuProc), cpuSys: r1(cpuSys), rss: mu.rss, heap: mu.heapUsed, memUsedPct: r1(((mem.total - mem.avail) / mem.total) * 100), memAvail: mem.avail, diskUsedPct: dsk2?.usedPct ?? null, dbBytes: sizeOf(file()) + sizeOf(`${file()}-wal`), writeMs: r1(writeMs), lagMs: r1(lagMs), phase: run.phase, p99: r1(pct(sorted, 99)), inflight };
+      tot.peakRps = Math.max(tot.peakRps, s.rps); run.totals = { req: tot.req, err: tot.err, peakRps: tot.peakRps, peakP95: Math.max(run.totals?.peakP95 || 0, s.p95) }; run.errorsLive = errors;
       win.n = 0; win.err = 0; win.lat = []; samples.push(s);
       if (run.phase === 'running' && performance.now() >= warmUntil) { peaks.cpuProc = Math.max(peaks.cpuProc, s.cpuProc); peaks.cpuSys = Math.max(peaks.cpuSys, s.cpuSys); peaks.rss = Math.max(peaks.rss, s.rss); peaks.heap = Math.max(peaks.heap, s.heap); peaks.memUsedPct = Math.max(peaks.memUsedPct, s.memUsedPct); peaks.diskUsedPct = Math.max(peaks.diskUsedPct, s.diskUsedPct || 0); peaks.writeMs = Math.max(peaks.writeMs, s.writeMs); peaks.lagMs = Math.max(peaks.lagMs, s.lagMs); peaks.rps = Math.max(peaks.rps, s.rps); } // set-up of the accounts is not exam load
       run.samples = samples; run.elapsed = r1(tt);
@@ -321,6 +339,15 @@ export function mountLoadTest({ r, db, now, audit, bad, settings, getMock, contr
       if (s.cpuProc >= 85) once('cpu', 'The app used most of its processor core.', 'warn'); if (s.memUsedPct >= 85) once('mem', 'Server memory passed 85%.', 'warn');
       if (s.lagMs >= 1000) once('lag', `The server froze for ${msT(s.lagMs)}.`, 'bad'); if (s.writeMs >= 150) once('db', `A database write took ${msT(s.writeMs)}.`, 'warn');
       if (cfg.submitAtEnd && run.submitFromAt && performance.now() >= run.submitFromAt) once('wave', 'Submit wave started: students are finishing.', 'info');
+      // live feed: milestones, new kinds of errors, recovery, busiest second
+      if (run.phase === 'running') {
+        const all_ = cfg.users + cfg.browsers; for (const m_ of [25, 50, 75, 100]) if (run.active >= all_ * (m_ / 100) && all_ >= 8) once(`m${m_}`, m_ === 100 ? `Everyone is active: ${run.active.toLocaleString()} students.` : `${m_}% of students are active (${run.active.toLocaleString()}).`, 'good');
+        for (const k_ of Object.keys(errors)) if (!flags[`e:${k_}`]) { flags[`e:${k_}`] = 1; run.events.push({ t: r1(tt), text: `New kind of failure: ${k_}.`, level: 'bad' }); }
+        if (flags.slow && s.p95 < 500 && win0 > 2) { recov++; if (recov >= 5 && !flags.recov) { flags.recov = 1; run.events.push({ t: r1(tt), text: 'Response time is back under 500 ms.', level: 'good' }); } } else recov = 0;
+        if (s.rps >= 50 && s.rps > peakEv * 1.25 && tt - lastPeakAt > 10) { peakEv = s.rps; lastPeakAt = tt; run.events.push({ t: r1(tt), text: `Busiest second so far: ${s.rps.toLocaleString()} requests.`, level: 'info' }); }
+        if (inflight > 1500) once('inflight', `${inflight.toLocaleString()} requests are waiting at once. The server is falling behind.`, 'warn');
+        if (run.events.length > 400) run.events.splice(1, run.events.length - 400);
+      }
       // safety stops
       const errRate = recent.length >= 30 ? recent.reduce((a, b) => a + b, 0) / recent.length : 0;
       if (errRate > cfg.errStopPct / 100) abort(`More than ${cfg.errStopPct}% of requests were failing, so the test was stopped to protect the server.`);
@@ -448,13 +475,17 @@ export function mountLoadTest({ r, db, now, audit, bad, settings, getMock, contr
     const browse = (cfg.users * cfg.browsePerMin * dur) / 60 * (cfg.pages.length ? 1 : 0) + (cfg.browsers * cfg.browserPerMin * dur) / 60 * (cfg.pages.length ? 1 : 0);
     const custom = cfg.custom.reduce((a, c) => a + c.perMin, 0) * (dur / 60) * cfg.users; const extra = (cfg.users * cfg.integrityPerMin * dur) / 60 + ((cfg.users + cfg.browsers) * cfg.homePerMin * dur) / 60;
     const requests = Math.round(cfg.users * (1 + per * (1 + cfg.pollPct / 100) + sub + (cfg.sectionMoves && sections > 1 ? 1 : 0)) + browse + custom + extra);
+    const total = cfg.users + cfg.browsers; const of_ = openFiles(); const m_ = memInfo();
+    const genMB = Math.round(total * 0.05 + 80); if (genMB * MB > m_.avail * 0.5) warnings.push(`Simulating ${total.toLocaleString()} students needs roughly ${genMB} MB of memory and about half of what is free (${Math.round(m_.avail / MB)} MB). The server could run low.`);
+    if (of_ && total * 1.2 > of_) warnings.push(`This server allows ${of_.toLocaleString()} open connections at once, fewer than the ${total.toLocaleString()} students. Some will fail to connect. Raise the open-files limit (ulimit -n) or use fewer students.`);
+    const setupSec = Math.round(total * (0.0004 + snapKB / 400000) * 10) / 10; if (setupSec > 20) warnings.push(`Creating ${total.toLocaleString()} virtual students takes about ${setupSec > 90 ? Math.round(setupSec / 60) + ' minutes' : Math.round(setupSec) + ' seconds'} before the test starts.`);
     const rps = Math.round(requests / Math.max(1, dur)); if (rps > 1500) warnings.push(`About ${rps} requests a second is more than one test generator on this server can send reliably. The numbers will look worse than real life.`);
-    return { ok: !blockers.length, blockers, warnings, est: { requests, rps, snapshotKB: snapKB, dbMB: Math.round((snapKB * cfg.users * 1.1) / 1024), seconds: dur + 15, sections, sharedCpuNote: 'The test runs on the server it measures, so it uses some of its processor. Real students arrive from outside, so real life is a little lighter than the test.' } };
+    return { ok: !blockers.length, blockers, warnings, est: { requests, rps, setupSec, genMB, openFiles: of_, snapshotKB: snapKB, dbMB: Math.round((snapKB * cfg.users * 1.1) / 1024), seconds: dur + 15, sections, sharedCpuNote: 'The test runs on the server it measures, so it uses some of its processor. Real students arrive from outside, so real life is a little lighter than the test.' } };
   }
   r.post('/loadtest/preflight', (req, res) => { const cfg = parseCfg(req.body || {}); res.json({ config: cfg, ...preflight(cfg) }); });
   // a light status call for the page to poll while a test runs: no database or mock work, so the check does not disturb the test
   r.get('/loadtest/live', (req, res) => {
-    const run = cur && { id: cur.id, phase: cur.phase, note: cur.note, config: cur.cfg, elapsed: cur.elapsed || 0, active: cur.active || 0, samples: (cur.samples || []).slice(-150), events: cur.events || [], marks: cur.marks || [], kinds: cur.kindsLive || {}, stopping: !!cur.stopping, error: cur.error || '', report: cur.report || null, startedAt: cur.startedAt };
+    const run = cur && { id: cur.id, phase: cur.phase, note: cur.note, config: cur.cfg, elapsed: cur.elapsed || 0, active: cur.active || 0, samples: (cur.samples || []).slice(-150), events: cur.events || [], marks: cur.marks || [], kinds: cur.kindsLive || {}, totals: cur.totals || null, errors: cur.errorsLive || {}, setupPct: cur.setupPct ?? null, setupSec: cur.setupSec ?? null, stopping: !!cur.stopping, error: cur.error || '', report: cur.report || null, startedAt: cur.startedAt };
     res.json({ run });
   });
   // how fast the server can sign students in, the part of an exam start that real traffic stresses most
@@ -474,7 +505,7 @@ export function mountLoadTest({ r, db, now, audit, bad, settings, getMock, contr
   });
   r.get('/loadtest', (req, res) => {
     const run = cur && { id: cur.id, phase: cur.phase, note: cur.note, config: cur.cfg, elapsed: cur.elapsed || 0, active: cur.active || 0, samples: cur.samples || [], events: cur.events || [], marks: cur.marks || [], kinds: cur.kindsLive || {}, stopping: !!cur.stopping, error: cur.error || '', report: cur.report || null, startedAt: cur.startedAt };
-    res.json({ info: info(), run, history: history(), presets: presets(), defaults: DEFAULTS, patterns: PATTERNS, pages: PAGES });
+    res.json({ info: info(), run, history: history(), baselineId: baselineId(), presets: presets(), defaults: DEFAULTS, patterns: PATTERNS, pages: PAGES });
   });
   r.post('/loadtest/start', async (req, res) => {
     if (cur && !['done', 'failed'].includes(cur.phase)) return bad(res, 'A test is already running.', 409);
@@ -495,7 +526,24 @@ export function mountLoadTest({ r, db, now, audit, bad, settings, getMock, contr
     if (!cur || ['done', 'failed'].includes(cur.phase)) return bad(res, 'No test is running.', 409);
     cur.userStop = true; cur.stopping = true; cur.abort?.('You stopped the test.'); audit(req, 'loadtest_stop', cur.id); res.json({ ok: true });
   });
-  r.get('/loadtest/report/:id', (req, res) => { const x = find(req.params.id); if (!x) return bad(res, 'That report is no longer saved.', 404); res.json({ report: x }); });
+  // the admin's own maximums, saved with the site settings
+  const savedLimits = () => settings.get('loadtest_limits', {});
+  applyLimits(savedLimits());
+  r.get('/loadtest/limits', (req, res) => res.json({ limits: limitsNow(), ceil: CEIL, defaults: LIMIT_DEFAULTS }));
+  r.put('/loadtest/limits', (req, res) => {
+    if (isRunning()) return bad(res, 'Wait for the running test to finish before changing limits.', 409);
+    const body = req.body || {}; const raw = body.reset ? {} : { ...savedLimits(), ...body }; const out = applyLimits(raw); settings.set('loadtest_limits', body.reset ? {} : out);
+    audit(req, 'loadtest_limits', body.reset ? 'reset' : `up to ${out.users} students, ${out.durationSec}s`); res.json({ ok: true, limits: out, ceil: CEIL });
+  });
+  // a baseline is the result later tests are judged against
+  const baselineId = () => { const id = settings.get('loadtest_baseline', ''); return id && find(id) ? id : ''; };
+  r.put('/loadtest/baseline', (req, res) => { const id = String(req.body?.id || ''); if (id && !find(id)) return bad(res, 'That report is no longer saved.', 404); settings.set('loadtest_baseline', id); audit(req, 'loadtest_baseline', id || 'cleared'); res.json({ ok: true, baselineId: id }); });
+  r.get('/loadtest/report/:id/csv', (req, res) => {
+    const x = find(req.params.id); if (!x) return bad(res, 'That report is no longer saved.', 404); const cols = ['t', 'users', 'rps', 'p95', 'p99', 'errors', 'inflight', 'cpuProc', 'cpuSys', 'memUsedPct', 'rss', 'writeMs', 'lagMs', 'diskUsedPct'];
+    const lines = [cols.join(','), ...(x.samples || []).map((q) => cols.map((c) => q[c] ?? '').join(','))];
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8'); res.setHeader('Content-Disposition', `attachment; filename="loadtest-${x.id}.csv"`); res.send(lines.join('\n'));
+  });
+  r.get('/loadtest/report/:id', (req, res) => { const x = find(req.params.id); if (!x) return bad(res, 'That report is no longer saved.', 404); const bid = baselineId(); const bl = bid && bid !== x.id ? find(bid) : null; res.json({ report: x, baselineId: bid, vsBaseline: bl ? { id: bl.id, label: bl.label || '', at: bl.at, ...compareOf(bl, x) } : null }); });
   r.put('/loadtest/report/:id', (req, res) => {
     const list = reports(); const x = list.find((y) => y.id === req.params.id); if (!x) return bad(res, 'That report is no longer saved.', 404); const b = req.body || {};
     if (b.label !== undefined) { x.label = String(b.label).trim().slice(0, 60); x.config.label = x.label; } if (b.note !== undefined) x.note = String(b.note).trim().slice(0, 300); if (b.pinned !== undefined) x.pinned = !!b.pinned;
