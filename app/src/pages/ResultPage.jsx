@@ -9,6 +9,8 @@ import { duration, fmtDateTime, num } from '../lib/format.js';
 import { useAuth } from '../lib/auth.jsx';
 import { analyse } from '../lib/analysis.js';
 import ShareCard from '../components/ShareCard.jsx';
+import { CardsSkeleton, CountUp, Reveal } from '../components/Motion.jsx';
+import { Burst, ScoreRing } from '../components/ResultReveal.jsx';
 import { AttemptStyle, IntegrityBadge, StrategyReport, TeacherNotes } from '../components/AttemptInsights.jsx';
 
 export default function ResultPage() {
@@ -17,7 +19,7 @@ export default function ResultPage() {
   const [d, setD] = useState(null); const [err, setErr] = useState('');
   useEffect(() => { api.get(`/attempts/${attemptId}/result`).then(setD).catch((e) => setErr(e.message)); }, [attemptId]);
   if (err) return <div className="alert" role="alert">{err} <Link to="/">Dashboard</Link></div>;
-  if (!d) return <p className="muted" role="status">Preparing your analysis…</p>;
+  if (!d) return <CardsSkeleton kind="result" />;
   const s = d.summary;
   const A = analyse(d, d.segments ? { ...config, segments: d.segments } : config);
   const { wrong, penalty: negLost } = A;
@@ -45,8 +47,8 @@ export default function ResultPage() {
       <IntegrityBadge live={d.live} />
       {d.kind === 'practice' && <p className="pr-banner" role="note"><b>Practice set.</b> Built from your weak topics. It does not count towards any leaderboard, rank or your mock history.</p>}
       {share && <ShareCard d={d} firstName={(user?.name || '').split(' ')[0]} onClose={() => setShare(false)} />}
-      <section className="score-hero card">
-        <div className="big-score"><span>Total score{qual.length ? ' (excl. Computer)' : ''}</span><strong>{s.score}<small> / {s.maxMarks}</small></strong><em>{s.percentage}%</em></div>
+      <section className="score-hero card reveal">{cmp && s.score > cmp.score && <Burst />}
+        <div className="big-score"><ScoreRing pct={s.percentage} /><div><span>Total score{qual.length ? ' (excl. Computer)' : ''}</span><strong><CountUp value={s.score} /><small> / {s.maxMarks}</small></strong><em><CountUp value={`${s.percentage}%`} /></em>{cmp && s.score > cmp.score && <b className="rv-better">▲ Better than {cmpLabel || 'your last attempt'}</b>}</div></div>
         <dl className="mini">
           <div><dt>Correct</dt><dd className="c-good">{s.correct}</dd></div><div><dt>Incorrect</dt><dd className="c-bad">{s.incorrect}</dd></div><div><dt>Unattempted</dt><dd>{s.unattempted}</dd></div>
           <div><dt>Accuracy</dt><dd>{s.accuracy}%</dd></div><div><dt>Attempted</dt><dd>{s.attempted}/{s.totalQuestions}</dd></div><div><dt>Marked for review</dt><dd>{s.marked}</dd></div>
@@ -55,7 +57,7 @@ export default function ResultPage() {
       </section>
 
       {d.plain && (
-        <section className="plainsum card" aria-label="Your result in plain words">
+        <section className="plainsum card rv-seq" aria-label="Your result in plain words">
           <h2>Your result in plain words</h2>
           <p className="ps-head">{d.plain.headline}</p>
           <ul>{d.plain.points.map((p, i) => <li key={i}>{p}</li>)}</ul>
@@ -64,7 +66,7 @@ export default function ResultPage() {
         </section>
       )}
 
-      {d.kind !== 'practice' && <section className="an-side" aria-label="How you compare">
+      {d.kind !== 'practice' && <section className="an-side rv-seq" aria-label="How you compare">
         <div className="an-card">
           <h3>Against other aspirants</h3>
           {com?.unlocked ? (<><p className="an-big">Top {Math.max(1, Math.round(100 - com.percentile))}%<small> · rank {com.rank} of {com.users}</small></p><p className="small muted">You beat {com.percentile}% of {site.name} students on this mock. Average {com.avgScore}, top score {com.topScore} (your best {com.yourBest}).</p></>)
@@ -77,7 +79,7 @@ export default function ResultPage() {
       </section>}
 
       {d.kind !== 'practice' && <><TeacherNotes notes={d.teacherNotes} /><AttemptStyle d={d} /><StrategyReport d={d} /></>}
-      <section className="an-card an-wide" aria-label="Where your marks went">
+      <section className="an-card an-wide rv-seq" aria-label="Where your marks went">
         <h3>Where your {s.maxMarks} marks went</h3>
         <div className="marksbar" role="img" aria-label={seg.map(([l, v]) => `${l} ${v}`).join(', ')}>{seg.map(([l, v, c]) => v > 0 && <i key={l} className={c} style={{ flex: v }} tabIndex={0} {...tip({ t: 'Where your marks went', v: `${l}: ${v}`, tone: /penalty|missed/i.test(l) ? 'bad' : /blank/i.test(l) ? 'mute' : 'good', rows: [['Share of paper', `${Math.round((v / s.maxMarks) * 100)}%`]] })} />)}</div>
         <ul className="marks-legend">{seg.map(([l, v, c]) => <li key={l}><i className={c} />{l} <b>{v}</b></li>)}</ul>

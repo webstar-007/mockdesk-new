@@ -297,19 +297,25 @@ export function makeFeatures({ db, now, settings, notifier, getMock, readResult,
     const attemptsOf = (ids) => (ids.length ? db.prepare(`SELECT id, user_id, mock_id, submitted_at, started_at, result FROM attempts WHERE status='submitted' AND mock_id!='practice' AND user_id IN (${ids.map(() => '?').join(',')}) ORDER BY submitted_at`).all(...ids) : []);
     const members = (b) => db.prepare("SELECT u.id, u.name, u.email, u.phone, u.last_seen, bm.joined_at FROM batch_members bm JOIN users u ON u.id=bm.user_id WHERE bm.batch_id=? AND COALESCE(u.role,'student')='student' ORDER BY u.name").all(b.id);
     const mockName = (id) => db.prepare('SELECT name FROM mocks WHERE id=?').get(id)?.name || id;
+    // Students against topics: each cell is that student's accuracy on the topic, empty when they answered fewer than 2 questions.
+    function heatOf(s) {
+      const cols = [...s.topics.entries()].filter(([, v]) => v.total >= 6).sort((a, b) => b[1].total - a[1].total).slice(0, 12).map(([k, v]) => ({ key: k, section: v.section, topic: v.topic, pct: pct(v.correct, v.total) }));
+      const rows = s.students.filter((x) => x.mocks).map((x) => ({ id: x.id, name: x.name, cells: cols.map((c) => { const o = s.ut.get(x.id)?.get(c.key); return o && o.n >= 2 ? { pct: pct(o.c, o.n), n: o.n } : null; }) }));
+      return { cols, rows };
+    }
     function summarise(b) {
-      const ms = members(b); const att = attemptsOf(ms.map((m) => m.id)); const by = new Map(); const topics = new Map(); const perMock = new Map(); const t = now();
+      const ms = members(b); const att = attemptsOf(ms.map((m) => m.id)); const by = new Map(); const topics = new Map(); const perMock = new Map(); const ut = new Map(); const t = now();
       for (const r of att) {
         const res = readResult(r); const s = res.summary; (by.get(r.user_id) || by.set(r.user_id, []).get(r.user_id)).push({ id: r.id, mock: r.mock_id, at: r.submitted_at, pct: s.percentage, acc: s.accuracy, score: s.score, max: s.maxMarks });
         const pm = perMock.get(r.mock_id) || { n: 0, p: [] }; pm.n++; pm.p.push(s.percentage); perMock.set(r.mock_id, pm);
-        for (const x of res.topics) { if (x.qualifying) continue; const k = `${x.section}:${x.topic}`; const o = topics.get(k) || { section: x.section, topic: x.topic, total: 0, correct: 0 }; o.total += x.total; o.correct += x.correct; topics.set(k, o); }
+        for (const x of res.topics) { if (x.qualifying) continue; const k = `${x.section}:${x.topic}`; const o = topics.get(k) || { section: x.section, topic: x.topic, total: 0, correct: 0 }; o.total += x.total; o.correct += x.correct; topics.set(k, o); const um = ut.get(r.user_id) || ut.set(r.user_id, new Map()).get(r.user_id); const uo = um.get(k) || { c: 0, n: 0 }; uo.c += x.correct; uo.n += x.total; um.set(k, uo); }
       }
       const students = ms.map((m) => { const a = by.get(m.id) || []; const last = a[a.length - 1]; const first = a[0]; return { id: m.id, name: m.name, contact: m.email || m.phone || '', joinedAt: m.joined_at, lastActive: m.last_seen || last?.at || null, mocks: a.length, avgPct: avg(a.map((x) => x.pct)), lastPct: last?.pct ?? null, series: a.slice(-8).map((x) => x.pct), trend: a.length > 1 ? Math.round((last.pct - first.pct) * 10) / 10 : null, inactive: !(m.last_seen && t - m.last_seen < 7 * DAY) && !(last && t - last.at < 7 * DAY) }; });
       const nameOf = new Map(ms.map((m) => [m.id, m.name])); const day0 = new Date(t).setHours(0, 0, 0, 0);
       const activity = Array.from({ length: 14 }, (_, i) => ({ day: day0 - (13 - i) * DAY, n: 0 })); for (const r of att) { const i = 13 - Math.floor((day0 + DAY - 1 - r.submitted_at) / DAY); if (i >= 0 && i < 14) activity[i].n++; }
       const recent = att.slice(-6).reverse().map((r) => { const s2 = readResult(r).summary; return { id: r.id, uid: r.user_id, student: nameOf.get(r.user_id), mock: mockName(r.mock_id), at: r.submitted_at, pct: s2.percentage }; });
       const dist = [0, 0, 0, 0, 0]; for (const x of students) if (x.mocks) dist[Math.min(4, Math.floor(x.avgPct / 20))]++;
-      return { activity, recent, dist, students, perMock: [...perMock.entries()].map(([id, v]) => ({ mockId: id, name: mockName(id), finished: v.n, avgPct: avg(v.p) })), weakTopics: [...topics.values()].filter((x) => x.total >= 6).map((x) => ({ ...x, pct: pct(x.correct, x.total) })).sort((a, b) => a.pct - b.pct).slice(0, 8), by };
+      return { activity, recent, dist, students, perMock: [...perMock.entries()].map(([id, v]) => ({ mockId: id, name: mockName(id), finished: v.n, avgPct: avg(v.p) })), weakTopics: [...topics.values()].filter((x) => x.total >= 6).map((x) => ({ ...x, pct: pct(x.correct, x.total) })).sort((a, b) => a.pct - b.pct).slice(0, 8), by, ut, topics };
     }
     api.get('/teacher/batches', guard, (req, res) => res.json({ batches: mine(req).map((b) => { const s = summarise(b); return { id: b.id, name: b.name, code: b.code, students: s.students.length, avgPct: avg(s.students.filter((x) => x.mocks).map((x) => x.avgPct)), active7: s.students.filter((x) => !x.inactive).length }; }) }));
     api.get('/teacher/overview', guard, (req, res) => {
@@ -326,7 +332,7 @@ export function makeFeatures({ db, now, settings, notifier, getMock, readResult,
     });
     api.get('/teacher/batches/:id', guard, (req, res) => {
       const b = batchOf(req); if (!b) return res.status(404).json({ error: 'Batch not found' });
-      const s = summarise(b); res.json({ batch: { id: b.id, name: b.name, code: b.code }, students: s.students, perMock: s.perMock, weakTopics: s.weakTopics, activity: s.activity, recent: s.recent, dist: s.dist });
+      const s = summarise(b); res.json({ batch: { id: b.id, name: b.name, code: b.code }, students: s.students, perMock: s.perMock, weakTopics: s.weakTopics, activity: s.activity, recent: s.recent, dist: s.dist, heat: heatOf(s) });
     });
     api.get('/teacher/batches/:id/students/:uid', guard, (req, res) => {
       const b = batchOf(req); if (!b) return res.status(404).json({ error: 'Batch not found' });

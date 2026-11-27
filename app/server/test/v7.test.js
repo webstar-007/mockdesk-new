@@ -125,6 +125,7 @@ test('batches: teacher sees only their own students', async () => {
   const login = await call('tina', 'POST', '/auth/login', { email: 'tina7@example.com', password: 'password123' }); assert.equal(login.body.user.role, 'teacher');
   const lst = await call('tina', 'GET', '/teacher/batches'); assert.deepEqual(lst.body.batches.map((x) => x.name), ['Evening batch']);
   const det = await call('tina', 'GET', `/teacher/batches/${b.body.id}`); assert.deepEqual(det.body.students.map((s) => s.name), ['ben']);
+  assert.ok(det.body.heat && Array.isArray(det.body.heat.cols) && Array.isArray(det.body.heat.rows), 'v29 heat map data');
   assert.equal((await call('tina', 'GET', `/teacher/batches/${other.body.id}`)).status, 404);
   const ben = det.body.students[0]; assert.equal((await call('tina', 'GET', `/teacher/batches/${b.body.id}/students/${ben.id}`)).status, 200);
   const ana = (await call('admin', 'GET', `/admin/batches/${other.body.id}`)).body.students[0];

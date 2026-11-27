@@ -2,7 +2,11 @@ import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { api } from '../lib/api.js';
 import { useCrumb } from '../components/PageNav.jsx';
-import { Dialog, toast } from '../admin/ui.jsx';
+import { Dialog, toast, undoable } from '../admin/ui.jsx';
+import { ProgressRing } from '../components/Motion.jsx';
+
+// Assignments removed but still inside their undo window. Kept here so the list hides them straight away.
+const pendingGone = new Set();
 
 const when = (ms) => new Date(ms).toLocaleString(undefined, { weekday: 'short', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' });
 const left = (ms) => { const d = ms - Date.now(); if (d < 0) return 'Past due'; const h = Math.floor(d / 3600000); return h < 24 ? `${Math.max(1, h)} hour${h === 1 ? '' : 's'} left` : `${Math.floor(h / 24)} day${Math.floor(h / 24) === 1 ? '' : 's'} left`; };
@@ -40,11 +44,11 @@ export function AssignmentList() {
   const load = () => api.get('/teacher/assignments').then(setD).catch((e) => setErr(e.message));
   useEffect(() => { load(); api.get('/teacher/batches').then((r) => setBatches(r.batches)).catch(() => {}); }, []);
   if (err) return <p className="alert" role="alert">{err}</p>; if (!d) return <Loading />;
-  const open = d.items.filter((x) => !x.overdue && x.dueAt > Date.now()); const past = d.items.filter((x) => !open.includes(x));
+  const items = d.items.filter((x) => !pendingGone.has(x.id)); const open = items.filter((x) => !x.overdue && x.dueAt > Date.now()); const past = items.filter((x) => !open.includes(x));
   const row = (a) => (
     <li key={a.id}><Link to={`/teacher/assignments/${a.id}`} className="tc-asg">
       <div><b>{a.title}</b><small className="muted">{a.batch} · {a.kind === 'practice' ? `${a.practiceSets} practice set${a.practiceSets > 1 ? 's' : ''}` : 'Mock'} · due {when(a.dueAt)}</small></div>
-      <div className="tc-asg-p"><span className="tc-bar" role="img" aria-label={`${a.done} of ${a.total} finished`}><i className={a.done === a.total ? 'good' : a.overdue ? 'low' : 'mid'} style={{ width: `${a.total ? Math.max(3, Math.round(a.done / a.total * 100)) : 0}%` }} /></span><small>{a.done} of {a.total} finished</small></div>
+      <div className="tc-asg-p"><ProgressRing done={a.done} total={a.total} tone={a.done === a.total ? 'good' : a.overdue ? 'low' : 'mid'} label={`${a.done} of ${a.total} finished`} /></div>
       <span className={`tc-chip ${a.overdue ? 'low' : ''}`}>{a.overdue ? `${a.pending} pending` : left(a.dueAt)}</span>
     </Link></li>);
   return (
@@ -70,10 +74,10 @@ export function AssignmentDetail() {
   const todo = a.students.filter((s) => !s.done); const done = a.students.filter((s) => s.done);
   const remind = async () => { setBusy(true); try { const r = await api.post(`/teacher/assignments/${id}/remind`); toast(r.message); } catch (e) { toast(e.message, 'bad'); } finally { setBusy(false); } };
   const extend = async () => { if (!ext) return; setBusy(true); try { await api.patch(`/teacher/assignments/${id}`, { dueAt: new Date(ext).getTime() }); toast('Due date changed. Reminders will go out again.'); setExt(''); load(); } catch (e) { toast(e.message, 'bad'); } finally { setBusy(false); } };
-  const remove = async () => { if (!window.confirm('Remove this assignment? Students will no longer see it.')) return; try { await api.delete(`/teacher/assignments/${id}`); nav('/teacher/assignments'); } catch (e) { toast(e.message, 'bad'); } };
+  const remove = () => undoable({ msg: `Removed “${a.title}”`, hide: () => { pendingGone.add(Number(id)); nav('/teacher/assignments'); }, restore: () => { pendingGone.delete(Number(id)); toast('Assignment kept'); nav(`/teacher/assignments/${id}`); }, commit: async () => { await api.delete(`/teacher/assignments/${id}`); pendingGone.delete(Number(id)); } });
   return (
     <div className="tc-page">
-      <div className="tc-hello"><div><h1>{a.title}</h1><p className="muted">{a.batch} · due {when(a.dueAt)} · {left(a.dueAt)}{a.note ? ` · “${a.note}”` : ''}</p></div>
+      <div className="tc-hello"><div className="tc-asg-h"><ProgressRing done={a.done} total={a.total} size={64} tone={a.done === a.total ? 'good' : a.overdue ? 'low' : 'mid'} /><div><h1>{a.title}</h1><p className="muted">{a.batch} · due {when(a.dueAt)} · {left(a.dueAt)}{a.note ? ` · “${a.note}”` : ''}</p></div></div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}><button className="btn btn-primary" disabled={busy || !todo.length} onClick={remind}>Remind {todo.length} student{todo.length === 1 ? '' : 's'}</button><button className="btn btn-ghost" onClick={remove}>Remove</button></div></div>
       <div className="tc-stats three"><div className="tc-stat good"><span>Finished</span><b>{a.done}</b><small>of {a.total}</small></div><div className={`tc-stat ${todo.length && a.overdue ? 'bad' : ''}`}><span>Not yet</span><b>{a.pending}</b></div><div className="tc-stat"><span>Finished late</span><b>{a.late}</b></div></div>
       <div className="tc-row2">

@@ -21,6 +21,7 @@ import './styles/v10.css';
 import './styles/v24.css';
 import './styles/help.css';
 import './styles/loadtest2.css';
+import './styles/motion2.css';
 import { captureInvite } from './lib/capture.js';
 captureInvite();
 createRoot(document.getElementById('root')).render(<BrowserRouter><App /></BrowserRouter>);

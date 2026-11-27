@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { api } from '../lib/api.js';
-import { Badge, ConfirmModal, Err, Loading, Stat, toast } from './ui.jsx';
+import { Badge, ConfirmModal, Err, Loading, Stat, toast, undoable } from './ui.jsx';
+import { CountUp, Spark } from '../components/Motion.jsx';
 import { Charts, Compare, LiveFeed, Report, Results, SHAPES, TONE, bytes, kindLabel, ms, shapeName } from './LoadTestParts.jsx';
 
 const fmtN = (n) => Number(n || 0).toLocaleString('en-IN');
@@ -51,11 +52,11 @@ function Live({ run, info, onStop, stopping }) {
       </div>
 
       <div className="lx-kpis">
-        <div className="lx-kpi"><span>Students active</span><b>{fmtN(run.active)}<small> of {fmtN(everyone)}</small></b><i className="lx-mini" style={{ '--w': `${Math.min(100, (run.active / Math.max(1, everyone)) * 100)}%` }} /></div>
-        <div className="lx-kpi"><span>Requests per second</span><b>{fmtN(last.rps ?? 0)}</b><small>busiest {fmtN(tot.peakRps)} · {fmtN(tot.req)} so far</small></div>
-        <div className={`lx-kpi ${last.p95 > 800 ? 't-bad' : last.p95 > 300 ? 't-warn' : ''}`}><span>Response time (p95)</span><b>{ms(last.p95 || 0)}</b><small>slowest 1 in 100: {ms(last.p99 || 0)}</small></div>
-        <div className={`lx-kpi ${tot.err ? 't-bad' : ''}`}><span>Failed requests</span><b>{fmtN(tot.err)}</b><small>{errPct}% of all · {last.errors ?? 0} this second</small></div>
-        <div className={`lx-kpi ${last.inflight > 1500 ? 't-warn' : ''}`}><span>Waiting for an answer</span><b>{fmtN(last.inflight ?? 0)}</b><small>requests in flight now</small></div>
+        <div className="lx-kpi"><span>Students active</span><b><CountUp value={run.active} /><small> of {fmtN(everyone)}</small></b><i className="lx-mini" style={{ '--w': `${Math.min(100, (run.active / Math.max(1, everyone)) * 100)}%` }} /></div>
+        <div className="lx-kpi"><span>Requests per second</span><b><CountUp value={last.rps ?? 0} /></b><Spark data={s.slice(-60).map((x) => x.rps)} className="lx-kspark" /><small>busiest {fmtN(tot.peakRps)} · {fmtN(tot.req)} so far</small></div>
+        <div className={`lx-kpi ${last.p95 > 800 ? 't-bad' : last.p95 > 300 ? 't-warn' : ''}`}><span>Response time (p95)</span><b>{ms(last.p95 || 0)}</b><Spark data={s.slice(-60).map((x) => x.p95)} className="lx-kspark" /><small>slowest 1 in 100: {ms(last.p99 || 0)}</small></div>
+        <div className={`lx-kpi ${tot.err ? 't-bad' : ''}`}><span>Failed requests</span><b><CountUp value={tot.err} /></b><small>{errPct}% of all · {last.errors ?? 0} this second</small></div>
+        <div className={`lx-kpi ${last.inflight > 1500 ? 't-warn' : ''}`}><span>Waiting for an answer</span><b><CountUp value={last.inflight ?? 0} /></b><Spark data={s.slice(-60).map((x) => x.inflight || 0)} className="lx-kspark" /><small>requests in flight now</small></div>
       </div>
 
       <div className="lx-meters card">
@@ -94,7 +95,7 @@ function Num({ label, k, form, set, lim, hint, placeholder, disabled, wide }) {
 function Row({ title, desc, on, onChange, locked, children }) {
   return (
     <div className={`lx-row ${on ? 'on' : ''}`}>
-      <label className="lx-row-h"><span className="lx-sw"><input type="checkbox" role="switch" checked={on} disabled={locked} onChange={(e) => onChange?.(e.target.checked)} /><i /></span><span><b>{title}</b><small>{desc}</small></span></label>
+      <label className="lx-row-h"><span className="sw"><input type="checkbox" role="switch" checked={on} disabled={locked} onChange={(e) => onChange?.(e.target.checked)} /><i /></span><span><b>{title}</b><small>{desc}</small></span></label>
       {on && children && <div className="lx-row-b">{children}</div>}
     </div>
   );
@@ -131,7 +132,7 @@ function Limits({ info, onClose, onSaved }) {
 }
 
 function Setup({ info, d, form, set, setForm, onStart }) {
-  const L = info.limits; const real = info.real || { students: 0, batches: [] }; const [adv, setAdv] = useState(false); const [showLimits, setShowLimits] = useState(false); const [pname, setPname] = useState(''); const [busy, setBusy] = useState(false); const [notes, setNotes] = useState(false);
+  const L = info.limits; const real = info.real || { students: 0, batches: [] }; const [adv, setAdv] = useState(false); const [showLimits, setShowLimits] = useState(false); const [pname, setPname] = useState(''); const [busy, setBusy] = useState(false); const [notes, setNotes] = useState(false); const [gonePre, setGonePre] = useState([]);
   const pages = form.pages || []; const custom = form.custom || []; const sub = form.submitAtEnd; const tg = form.targets || {}; const total = (form.users || 0) + (form.browsers || 0);
   const [pre, setPre] = useState(null); const cfgKey = JSON.stringify({ ...form, note: '', label: '' });
   useEffect(() => { const h = setTimeout(() => { api.post('/admin/loadtest/preflight', form).then(setPre).catch(() => setPre(null)); }, 500); return () => clearTimeout(h); }, [cfgKey]); // eslint-disable-line
@@ -159,7 +160,7 @@ function Setup({ info, d, form, set, setForm, onStart }) {
 
       <Section n="1" title="Choose a scenario" sub="A starting point. Everything below can still be changed.">
         <div className="lx-scen" role="group" aria-label="Scenarios">{scen.map((x) => <button key={x.id} type="button" className={`lx-sc ${picked === x.id ? 'on' : ''}`} aria-pressed={picked === x.id} onClick={() => apply(x.cfg)}><span aria-hidden="true">{x.icon}</span><b>{x.name}</b><small>{x.text}</small></button>)}</div>
-        {d.presets.length > 0 && <div className="lx-mine" role="group" aria-label="Your saved presets"><span className="muted small">Yours</span>{d.presets.map((p) => <span key={p.id} className="chip lt-mine"><button type="button" onClick={() => apply({ ...p.config })}><b>{p.name}</b> <span className="small">{fmtN(p.config.users)} students</span></button><button type="button" className="lt-x" aria-label={`Delete preset ${p.name}`} onClick={async () => { await api.del(`/admin/loadtest/presets/${p.id}`); d.reload(); }}>×</button></span>)}</div>}
+        {d.presets.filter((p) => !gonePre.includes(p.id)).length > 0 && <div className="lx-mine" role="group" aria-label="Your saved presets"><span className="muted small">Yours</span>{d.presets.filter((p) => !gonePre.includes(p.id)).map((p) => <span key={p.id} className="chip lt-mine"><button type="button" onClick={() => apply({ ...p.config })}><b>{p.name}</b> <span className="small">{fmtN(p.config.users)} students</span></button><button type="button" className="lt-x" aria-label={`Delete preset ${p.name}`} onClick={() => undoable({ msg: `Removed preset “${p.name}”`, hide: () => setGonePre((g) => [...g, p.id]), restore: () => setGonePre((g) => g.filter((i) => i !== p.id)), commit: async () => { await api.del(`/admin/loadtest/presets/${p.id}`); d.reload(); } })}>×</button></span>)}</div>}
       </Section>
 
       <Section n="2" title="How big and how long" right={<button className="lx-link" onClick={() => setShowLimits(true)}>Change limits</button>}>

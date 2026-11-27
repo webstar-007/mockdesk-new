@@ -1,4 +1,5 @@
 import { useSite } from '../lib/site.js';
+import { ToastHost } from '../admin/ui.jsx';
 import BrandMark from '../components/BrandMark.jsx';
 import { useEffect, useState } from 'react';
 import { Link, Navigate, Route, Routes, useLocation, useParams } from 'react-router-dom';
@@ -78,6 +79,23 @@ function Batches() {
   </div>);
 }
 
+/** Students down the side, topics across the top. Darker red means weaker. Click a name to open the student. */
+function Heat({ heat, id }) {
+  const [sel, setSel] = useState(null); const [sort, setSort] = useState('name'); if (!heat?.cols.length || !heat.rows.length) return <p className="muted">Shows up once students have answered enough questions on a few topics.</p>;
+  const avg = (r) => { const v = r.cells.filter(Boolean); return v.length ? v.reduce((a, c) => a + c.pct, 0) / v.length : 101; };
+  const rows = [...heat.rows].sort((a, b) => (sort === 'name' ? a.name.localeCompare(b.name) : avg(a) - avg(b)));
+  const shade = (p) => `color-mix(in srgb, ${p >= 70 ? 'var(--good)' : p >= 45 ? 'var(--warn,#f59e0b)' : 'var(--bad)'} ${Math.round(18 + (p >= 70 ? (p - 70) / 30 : p >= 45 ? 0.5 : (45 - p) / 45) * 62)}%, var(--surface))`;
+  const cell = sel && rows[sel[0]]?.cells[sel[1]]; const col = sel && heat.cols[sel[1]];
+  return (
+    <div className="hx">
+      <div className="hx-bar"><div className="tc-seg" role="group" aria-label="Sort students">{[['name', 'Name'], ['weak', 'Weakest first']].map(([k, l]) => <button key={k} className={sort === k ? 'on' : ''} aria-pressed={sort === k} onClick={() => setSort(k)}>{l}</button>)}</div>
+        <span className="hx-key small muted"><i style={{ background: shade(20) }} /> under 45% <i style={{ background: shade(55) }} /> 45–70% <i style={{ background: shade(90) }} /> 70%+ <i className="none" /> not enough answers</span></div>
+      <div className="hx-wrap"><table className="hx-t"><thead><tr><th scope="col">Student</th>{heat.cols.map((c, j) => <th key={c.key} scope="col" className={sel?.[1] === j ? 'sel' : ''}><span title={`${c.topic}, batch ${c.pct}%`}>{c.topic}</span></th>)}</tr></thead>
+        <tbody>{rows.map((r, i) => <tr key={r.id} style={{ '--i': i }}><th scope="row"><Link to={`/teacher/${id}/${r.id}`}>{r.name}</Link></th>{r.cells.map((c, j) => <td key={j}>{c ? <button type="button" className={`hx-cell ${sel && sel[0] === i && sel[1] === j ? 'sel' : ''}`} style={{ background: shade(c.pct) }} aria-label={`${r.name}, ${heat.cols[j].topic}: ${c.pct}% from ${c.n} questions`} onClick={() => setSel(sel && sel[0] === i && sel[1] === j ? null : [i, j])}>{c.pct}</button> : <span className="hx-cell none" aria-label="Not enough answers">·</span>}</td>)}</tr>)}</tbody></table></div>
+      {cell && <p className="hx-pop" role="status"><b>{rows[sel[0]].name}</b> got <b>{cell.pct}%</b> on {col.topic} ({cell.n} questions). Batch average {col.pct}%. <Link to={`/teacher/${id}/${rows[sel[0]].id}`}>Open student</Link></p>}
+    </div>
+  );
+}
 function Batch() {
   const { id } = useParams(); const { data, err } = useGet(`/teacher/batches/${id}`); const [q, setQ] = useState(''); const [sort, setSort] = useState('name'); const [view, setView] = useState('all');
   if (err) return <><p className="alert" role="alert">{err}</p></>;
@@ -107,6 +125,8 @@ function Batch() {
       <section className="card tc-sec"><Head><h2>Mock averages</h2></Head>{!data.perMock.length ? <p className="muted">No one has finished a mock yet.</p> : <ul className="tc-list">{data.perMock.map((m) => <li key={m.mockId}><span>{m.name.replace('CGL Tier-II ', '')}<small className="muted"> · {m.finished}</small></span><Bar v={m.avgPct} tone={tone(m.avgPct)} /><b>{m.avgPct}%</b></li>)}</ul>}</section>
     </div>
     <section className="card tc-sec"><Head><h2>Weakest topics in this batch</h2><small className="muted">Plan your next class around these</small></Head>{!data.weakTopics.length ? <p className="muted">Shows up once students have answered enough questions.</p> : <ul className="tc-list two">{data.weakTopics.map((t) => <li key={t.section + t.topic}><span>{t.topic}<small className="muted"> · {t.total} answers</small></span><Bar v={t.pct} tone={tone(t.pct)} /><b>{t.pct}%</b></li>)}</ul>}</section>
+
+    <section className="card tc-sec" aria-label="Topic heat map"><Head><h2>Who is weak where</h2><small className="muted">Accuracy by student and topic. Tap a cell for detail.</small></Head><Heat heat={data.heat} id={id} /></section>
 
     <section aria-label="Students"><Head><h2>Students</h2></Head>
       <div className="tc-tools">
@@ -172,7 +192,7 @@ export default function TeacherApp() {
   const { user, logout } = useAuth();
   if (user?.role !== 'teacher') return <Navigate to="/" replace />;
   return (
-    <div className="tc">
+    <div className="tc"><ToastHost />
       <header className="topbar"><div className="topbar-in"><Link to="/teacher" className="brand"><BrandMark /><span>{site.name} <small className="muted">Teacher</small></span></Link><div className="topbar-user"><Link className="btn btn-ghost btn-sm" to="/teacher/health">Health</Link><Link className="btn btn-ghost btn-sm" to="/teacher/doubts">Doubts</Link><Link className="btn btn-ghost btn-sm" to="/teacher/assignments">Assignments</Link><Link className="btn btn-ghost btn-sm" to="/teacher/tricks">Tricks</Link><ThemeToggle /><span className="who">{user.name}</span><button className="btn btn-ghost btn-sm" onClick={logout}>Sign out</button></div></div></header>
       <main className="shell" id="main"><TeacherNav /><Routes><Route index element={<Batches />} /><Route path="assignments" element={<AssignmentList />} /><Route path="tricks" element={<Tricks />} /><Route path="health" element={<div><div className="pagehead"><div><h1>Batch health</h1><p className="muted small">Who is slipping in your batches. Nudge them in one click.</p></div></div><HealthBoard base="/teacher" /></div>} /><Route path="doubts" element={<div><div className="pagehead"><div><h1>Doubts</h1><p className="muted small">Questions your students ask from their review page.</p></div></div><DeskQueue base="/teacher" /></div>} /><Route path="assignments/:id" element={<AssignmentDetail />} /><Route path=":id" element={<Batch />} /><Route path=":id/:uid" element={<Student />} /><Route path="*" element={<Navigate to="/teacher" replace />} /></Routes></main>
     </div>

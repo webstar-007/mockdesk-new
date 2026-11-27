@@ -8,8 +8,12 @@ import { tip } from '../components/Tip.jsx';
 import PdfMenu from '../components/PdfMenu.jsx';
 import Blueprint from '../components/Blueprint.jsx';
 import PracticeCard from '../components/PracticeCard.jsx';
+import { CardsSkeleton, CountUp, Spark } from '../components/Motion.jsx';
+import { BlockBoard } from '../components/Blocks.jsx';
+import ProgressTimeline from '../components/ProgressTimeline.jsx';
 import { ActivityMap, LockedInsights, ToolTiles, ReadinessGauge, SkillRadar, StudyPlanner, Trajectory, readinessOf } from '../components/Insights.jsx';
 
+const DASH_BLOCKS = [['asg', 'Set by your teacher'], ['next', 'Next step and snapshot'], ['mocks', 'Your mocks and focus'], ['practice', 'Practice and recent results'], ['journey', 'Your journey'], ['analysis', 'Guides and detailed analysis'], ['tools', 'Toolkit']];
 const STATUS = { not_attempted: ['Not attempted', 'st-none'], in_progress: ['In progress', 'st-prog'], completed: ['Completed', 'st-done'] };
 export default function Dashboard() {
   const { user, config } = useAuth();
@@ -28,7 +32,7 @@ export default function Dashboard() {
     nav(`/mock/${m.id}`);
   };
   if (err) return <div className="alert" role="alert">{err}</div>;
-  if (!allMocks) return <p role="status" className="muted">Loading dashboard…</p>;
+  if (!allMocks) return <CardsSkeleton kind="dash" />;
   const mocks = allMocks.filter((m) => (m.examId || 'ssc-cgl-t2') === exam);
   const pat = config?.patterns?.[exam]; const bpConfig = pat ? { ...config, sections: pat.sections, segments: pat.segments } : config;
   const gap = user?.targetScore && stats?.bestScore != null ? user.targetScore - stats.bestScore : null;
@@ -77,16 +81,8 @@ export default function Dashboard() {
   const segMin = (k) => (pat?.segments || config?.segments || []).find((g) => g.sections.includes(k))?.minutes;
   const pathList = mocks.slice(0, 12);
   const statusOf = (m) => (m.status === 'completed' ? 'done' : m.status === 'in_progress' ? 'prog' : m.locked || m.upcoming ? 'lock' : 'todo');
-  return (
-    <div className="nd">
-      <header className="nd-top">
-        <div><h1>{greet}, {first}</h1>
-          <p>{daysLeft != null && daysLeft >= 0 ? (daysLeft === 0 ? 'Your exam is today. Good luck!' : `${daysLeft} day${daysLeft === 1 ? '' : 's'} to your exam`) : done ? `${done} of ${mocks.length} mocks done` : 'Let’s set your baseline with a first mock'}</p></div>
-        {exams.length > 1 && <div className="nd-seg" role="group" aria-label="Choose exam">{exams.map((x) => <button key={x.id} className={exam === x.id ? 'on' : ''} aria-pressed={exam === x.id} onClick={() => { setExam(x.id); setFilter('all'); }}>{x.name}</button>)}</div>}
-      </header>
-
-      {asg.length > 0 && (
-        <section className="nd-asg" aria-label="Set by your teacher">
+  const NODES = {
+    asg: asg.length > 0 ? (<section className="nd-asg" aria-label="Set by your teacher">
           <h2>Set by your teacher</h2>
           <ul>{asg.map((a) => {
             const d = new Date(a.dueAt);
@@ -98,10 +94,8 @@ export default function Dashboard() {
               </li>
             );
           })}</ul>
-        </section>
-      )}
-
-      <div className="nd-r1">
+        </section>) : null,
+    next: (<div className="nd-r1">
         <section className="nd-hero" aria-label="Your next step">
           <div className="nd-hero-top">
             {nextMock ? <>
@@ -125,12 +119,12 @@ export default function Dashboard() {
           <section className="nd-card nd-snap" aria-label="Your snapshot">
             <div className="nd-snap-h">
               <div className="nd-gauge" role="img" aria-label={`Readiness ${readiness.value} out of 100, ${readiness.band}`}><svg viewBox="0 0 100 100" aria-hidden="true"><circle cx="50" cy="50" r={R} className="bg" /><circle cx="50" cy="50" r={R} className="fg" strokeDasharray={`${(readiness.value / 100) * C} ${C}`} transform="rotate(-90 50 50)" /></svg><b>{readiness.value}</b></div>
-              <div><span className="nd-k">Exam readiness</span><strong>{readiness.band}</strong></div>
+              <div><span className="nd-k">Exam readiness</span><strong>{readiness.band}</strong></div>{examHist.length > 2 && <Spark className="nd-spark" data={[...examHist].reverse().map((h) => h.score)} width={80} height={30} label="Your recent scores" />}
             </div>
             <dl className="nd-kv">
-              <div><dt>Best score</dt><dd>{num(kBest)}<small>/{maxMarks}</small></dd></div>
-              <div><dt>Average</dt><dd>{num(kAvg)}%</dd></div>
-              <div><dt>Accuracy</dt><dd>{num(stats.avgAccuracy)}%</dd></div>
+              <div><dt>Best score</dt><dd><CountUp value={kBest} /><small>/{maxMarks}</small></dd></div>
+              <div><dt>Average</dt><dd><CountUp value={`${num(kAvg)}%`} /></dd></div>
+              <div><dt>Accuracy</dt><dd><CountUp value={`${num(stats.avgAccuracy)}%`} /></dd></div>
               <div><dt>{targetPct != null ? 'Of target' : 'Mocks done'}</dt><dd>{targetPct != null ? `${targetPct}%` : `${done}/${mocks.length}`}</dd></div>
             </dl>
           </section>
@@ -138,9 +132,8 @@ export default function Dashboard() {
           <section className="nd-card nd-how" aria-label="How it works"><h3>How it works</h3>
             <ol><li><b>Take a full mock</b><span>Real exam timing and sectional locks.</span></li><li><b>Get your analysis</b><span>Scores, accuracy and weak topics.</span></li><li><b>Practise and improve</b><span>Targeted sets built from your mistakes.</span></li></ol></section>
         )}
-      </div>
-
-      <div className="nd-r2">
+      </div>),
+    mocks: (<div className="nd-r2">
         <section className="nd-card nd-mocks-box" aria-label="Your mocks">
           <div className="nd-sec-h"><h2>Your mocks</h2>
             <div className="nd-seg sm" role="group" aria-label="Filter mocks">
@@ -180,15 +173,14 @@ export default function Dashboard() {
             <ul>{glance.map(([k, c]) => <li key={k}><span>{c.short}{c.qualifying && <em>Qualifying</em>}</span><b>{c.questions} Qs</b><small>{segMin(k) ? `${segMin(k)} min` : ''}</small></li>)}</ul>
             <p>+{sc.marksPerQuestion} for each correct answer, −{sc.negativeMarks} for each wrong one.</p></section>}
         </aside>
-      </div>
-
-      <div className={`nd-r3 ${examHist.length > 0 ? '' : 'solo'}`}>
+      </div>),
+    practice: (<div className={`nd-r3 ${examHist.length > 0 ? '' : 'solo'}`}>
         <div className="nd-practice"><PracticeCard /></div>
         {examHist.length > 0 && <section className="nd-card nd-recent"><div className="nd-sec-h"><h3>Recent results</h3></div>
           <ul>{examHist.slice(0, 4).map((h) => <li key={h.id}><div><b>{h.mockName.replace('CGL Tier-II ', '')}</b><small>{fmtDate(h.submittedAt)} · {h.accuracy}% accuracy</small></div><span>{h.score}<small>/{h.maxMarks}</small></span><Link to={`/results/${h.id}`}>Analysis</Link></li>)}</ul></section>}
-      </div>
-
-      <div className="nd-r4">
+      </div>),
+    journey: examHist.length > 0 ? <ProgressTimeline hist={examHist} maxMarks={maxMarks} /> : null,
+    analysis: (<div className="nd-r4">
         {hasData && <details className="nd-details"><summary><span>Detailed analysis</span><small>Skills, study plan, trend, activity, history</small></summary>
           <div className="ix-grid">
             <ReadinessGauge r={readiness} /><SkillRadar sections={stats.sections} />
@@ -203,8 +195,17 @@ export default function Dashboard() {
         <details className="nd-details"><summary><span>Exam guide</span><small>Paper pattern, marking and exam-day tips</small></summary>
           <div className="nd-guide"><Blueprint config={bpConfig} examName={examName} />
             <div className="hm-tip-grid">{tips.map(([t, d], i) => <div className="hm-tip" key={t}><b aria-hidden="true">{['①', '②', '③', '④'][i]}</b><div><h4>{t}</h4><p>{d}</p></div></div>)}</div></div></details>
-      </div>
-      {stats?.completed ? <ToolTiles /> : null}
+      </div>),
+    tools: stats?.completed ? <ToolTiles /> : null,
+  };
+  return (
+    <div className="nd">
+      <header className="nd-top">
+        <div><h1>{greet}, {first}</h1>
+          <p>{daysLeft != null && daysLeft >= 0 ? (daysLeft === 0 ? 'Your exam is today. Good luck!' : `${daysLeft} day${daysLeft === 1 ? '' : 's'} to your exam`) : done ? `${done} of ${mocks.length} mocks done` : 'Let’s set your baseline with a first mock'}</p></div>
+        {exams.length > 1 && <div className="nd-seg" role="group" aria-label="Choose exam">{exams.map((x) => <button key={x.id} className={exam === x.id ? 'on' : ''} aria-pressed={exam === x.id} onClick={() => { setExam(x.id); setFilter('all'); }}>{x.name}</button>)}</div>}
+      </header>
+      <BlockBoard uid={user.id} ids={DASH_BLOCKS} nodes={NODES} />
     </div>
   );
 }

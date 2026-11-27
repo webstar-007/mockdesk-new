@@ -533,12 +533,12 @@ export function adminRouter({ v24, tips, assign, exitFn, drafter = null, db, now
   });
   r.get('/live', (req, res) => {
     const t = now(); const names = new Map(db.prepare('SELECT id, name FROM mocks').all().map((m) => [m.id, m.name]));
-    const rows = db.prepare("SELECT a.id, a.user_id, a.mock_id, a.started_at, a.segment_index, a.segment_started_at, a.responses, u.name, u.email, u.phone FROM attempts a JOIN users u ON u.id=a.user_id WHERE a.status='in_progress' AND a.started_at > ? ORDER BY a.started_at DESC").all(t - 4 * 3600000);
+    const rows = db.prepare("SELECT a.id, a.user_id, a.mock_id, a.started_at, a.segment_index, a.segment_started_at, a.responses, a.integrity, u.name, u.email, u.phone, u.last_seen FROM attempts a JOIN users u ON u.id=a.user_id WHERE a.status='in_progress' AND a.started_at > ? ORDER BY a.started_at DESC").all(t - 4 * 3600000);
     const total = examConfig.segments.length; const totalQ = Object.values(examConfig.sections).reduce((a, x) => a + (x.questions || 0), 0); const examOf = new Map(db.prepare('SELECT id, exam_id FROM mocks').all().map((m) => [m.id, m.exam_id]));
     const live = rows.map((a) => {
       let answered = 0; try { answered = Object.values(JSON.parse(a.responses || '{}')).filter((x) => x && x.selected != null).length; } catch { /* ignore */ }
       const pat = exams.patternFor(examOf.get(a.mock_id)); const seg = pat.segments[a.segment_index]; const left = seg ? Math.max(0, seg.minutes * 60 - (t - a.segment_started_at) / 1000) : null;
-      return { id: a.id, userId: a.user_id, user: a.name, contact: a.email || a.phone, mockId: a.mock_id, mockName: names.get(a.mock_id) || a.mock_id, startedAt: a.started_at, segment: Math.min(a.segment_index + 1, total), segments: total, segmentLabel: seg ? seg.sections.map((x) => examConfig.sections[x].short).join(' + ') : 'Finishing', segmentStartedAt: a.segment_started_at, minutes: seg?.minutes ?? null, answeredSoFar: answered, overtime: seg ? left === 0 : false };
+      return { id: a.id, userId: a.user_id, user: a.name, contact: a.email || a.phone, mockId: a.mock_id, mockName: names.get(a.mock_id) || a.mock_id, startedAt: a.started_at, segment: Math.min(a.segment_index + 1, total), segments: total, segmentLabel: seg ? seg.sections.map((x) => examConfig.sections[x].short).join(' + ') : 'Finishing', segmentStartedAt: a.segment_started_at, minutes: seg?.minutes ?? null, answeredSoFar: answered, overtime: seg ? left === 0 : false, lastSeen: a.last_seen || null, leaves: (() => { try { return Number(JSON.parse(a.integrity || '{}').leaves) || 0; } catch { return 0; } })() };
     });
     const dayStart = new Date(t); dayStart.setHours(0, 0, 0, 0); const d0 = dayStart.getTime();
     const todayAtt = db.prepare('SELECT status, started_at FROM attempts WHERE started_at >= ?').all(d0);

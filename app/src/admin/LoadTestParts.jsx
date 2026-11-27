@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { api } from '../lib/api.js';
-import { Badge, Empty, Stat, dt, toast } from './ui.jsx';
+import { Badge, Empty, Stat, dt, toast, undoable } from './ui.jsx';
 
 export const MB = 1048576;
 export const bytes = (b) => (b == null ? '–' : b > 1073741824 ? `${(b / 1073741824).toFixed(1)} GB` : `${Math.round(b / MB)} MB`);
@@ -65,7 +65,7 @@ export function LiveFeed({ events, live }) {
   return (
     <section className="card lx-feed"><div className="lx-feed-h"><h3>{live ? 'Live feed' : 'What happened'}</h3>
       <div className="lx-chips" role="group" aria-label="Filter events">{[['all', `All ${all.length}`], ['bad', `Problems ${bad}`], ['good', `Good ${good}`]].map(([k, l]) => <button key={k} type="button" className={f === k ? 'on' : ''} aria-pressed={f === k} onClick={() => setF(k)}>{l}</button>)}</div></div>
-      {list.length ? <ol className="lt-feed">{list.map((e, i) => <li key={i} className={`t-${e.level}`}><time>{Math.round(e.t)}s</time><span>{e.text}</span></li>)}</ol> : <p className="muted small">Nothing in this filter.</p>}
+      {list.length ? <ol className="lt-feed">{list.map((e) => <li key={all.indexOf(e)} className={`t-${e.level}`}><time>{Math.round(e.t)}s</time><span>{e.text}</span></li>)}</ol> : <p className="muted small">Nothing in this filter.</p>}
     </section>
   );
 }
@@ -240,8 +240,8 @@ export function Compare({ a, b, cmp, onSwap, onBack }) {
   );
 }
 
-export function Results({ h, onOpen, onCompare, onChanged, onRerunId, baselineId }) {
-  const [sel, setSel] = useState([]); const toggle = (id) => setSel((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id].slice(-2)));
+export function Results({ h: all, onOpen, onCompare, onChanged, onRerunId, baselineId }) {
+  const [gone, setGone] = useState([]); const h = all?.filter((x) => !gone.includes(x.id)); const [sel, setSel] = useState([]); const toggle = (id) => setSel((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id].slice(-2)));
   const [busy, setBusy] = useState('');
   if (!h?.length) return <Empty>No saved tests yet. Run a test and the result is saved here so you can compare it with later ones.</Empty>;
   const act = async (fn, id) => { setBusy(id); try { await fn(); onChanged(); } catch (e) { toast(e.message, 'bad'); } finally { setBusy(''); } };
@@ -260,7 +260,7 @@ export function Results({ h, onOpen, onCompare, onChanged, onRerunId, baselineId
           <td>{x.users} for {x.durationSec}s<div className="muted small">{shapeName(x.pattern)}</div></td><td>{ms(x.p95)}</td><td>{x.errorPct}%</td><td>{x.peakCpu}%</td><td>{x.score ?? '–'}</td>
           <td><Badge tone={TONE[x.level]}>{x.title}{x.stopped ? ' (stopped)' : ''}</Badge>{x.targets && <div className={`small ${x.targets.pass ? '' : 'sx-bad'}`}>{x.targets.pass ? '✓ Targets met' : `✗ ${x.targets.total - x.targets.passed} target${x.targets.total - x.targets.passed > 1 ? 's' : ''} missed`}</div>}</td>
           <td className="lt-row-act">{x.hasReport ? <><button className="btn btn-ghost btn-sm" onClick={() => onOpen(x.id)}>Open</button><button className="btn btn-ghost btn-sm" disabled={busy === x.id} onClick={() => act(() => api.put(`/admin/loadtest/report/${x.id}`, { pinned: !x.pinned }), x.id)}>{x.pinned ? 'Unpin' : 'Pin'}</button><button className="btn btn-ghost btn-sm" onClick={() => onRerunId(x.id)}>Run again</button></> : <span className="muted small">Summary only</span>}
-            <button className="btn btn-ghost btn-sm" disabled={busy === x.id} onClick={() => act(() => api.del(`/admin/loadtest/report/${x.id}`), x.id)}>Delete</button></td></tr>)}</tbody></table></div>
+            <button className="btn btn-ghost btn-sm" disabled={busy === x.id} onClick={() => undoable({ msg: `Deleted “${x.label || 'this test'}”`, hide: () => { setGone((g) => [...g, x.id]); setSel((v) => v.filter((i) => i !== x.id)); }, restore: () => setGone((g) => g.filter((i) => i !== x.id)), commit: async () => { await api.del(`/admin/loadtest/report/${x.id}`); onChanged(); } })}>Delete</button></td></tr>)}</tbody></table></div>
     </section>
     </>
   );

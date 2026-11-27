@@ -2,9 +2,26 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Badge, Bars, Empty, Err, Loading, PageHead, Stat, ago, mmss, useLoad } from './ui.jsx';
 
+const initials = (n) => (n || '?').split(/\s+/).map((x) => x[0]).slice(0, 2).join('').toUpperCase();
+const stateOf = (a, l) => (a.overtime || a.leaves >= 5 ? 'bad' : (l != null && l <= 300) || (a.lastSeen && Date.now() - a.lastSeen > 180000) || a.leaves >= 2 ? 'warn' : 'ok');
+/** One tile per student. The ring is progress; the glow shows who might need help. */
+function Floor({ rows, d, left }) {
+  return (
+    <ul className="fl-grid" aria-label="Students in a test">
+      {rows.map((a) => { const l = left(a); const st = stateOf(a, l); const pct = Math.min(100, Math.round((a.answeredSoFar / (d.totalQ || 1)) * 100));
+        return (
+          <li key={a.id} className={`fl-t ${st}`}>
+            <Link to={`/admin/attempts/${a.id}`} aria-label={`${a.user}: ${a.answeredSoFar} of ${d.totalQ} answered, ${a.overtime ? 'timer ended' : `${mmss(l)} left`}${a.leaves ? `, left the tab ${a.leaves} times` : ''}`}>
+              <svg viewBox="0 0 44 44" aria-hidden="true"><circle className="bg" cx="22" cy="22" r="19" /><circle className="fg" cx="22" cy="22" r="19" pathLength="100" style={{ strokeDasharray: `${pct} 100` }} /></svg><span className="fl-av">{initials(a.user)}</span>
+              <b title={a.user}>{a.user}</b><small>{a.overtime ? 'Timer ended' : l != null ? mmss(l) : '–'}{a.leaves ? ` · ${a.leaves}↗` : ''}</small>
+            </Link>
+          </li>); })}
+    </ul>
+  );
+}
 export default function Live() {
   const { data: d, err, loading, reload } = useLoad('/admin/live'); const [, tick] = useState(0);
-  const [auto, setAuto] = useState(true); const [q, setQ] = useState(''); const [mock, setMock] = useState(''); const [sort, setSort] = useState('left'); const [stamp, setStamp] = useState(Date.now());
+  const [auto, setAuto] = useState(true); const [q, setQ] = useState(''); const [mock, setMock] = useState(''); const [sort, setSort] = useState('left'); const [stamp, setStamp] = useState(Date.now()); const [view, setView] = useState(() => { try { return localStorage.getItem('md-live-view') || 'floor'; } catch { return 'floor'; } });
   useEffect(() => { const b = setInterval(() => tick((x) => x + 1), 1000); return () => clearInterval(b); }, []);
   useEffect(() => { if (!auto) return; const a = setInterval(() => { reload(); setStamp(Date.now()); }, 15000); return () => clearInterval(a); }, [reload, auto]);
   useEffect(() => { if (d) setStamp(Date.now()); }, [d]);
@@ -19,6 +36,7 @@ export default function Live() {
   const n = d.live.length; const answered = d.live.reduce((a, x) => a + x.answeredSoFar, 0);
   const closing = d.live.filter((a) => { const l = left(a); return l != null && l <= 300; }).length;
   const over = d.live.filter((a) => a.overtime).length;
+  const pick = (v) => { setView(v); try { localStorage.setItem('md-live-view', v); } catch { /* ignore */ } };
   const copy = (txt) => { try { navigator.clipboard.writeText(txt); } catch { /* ignore */ } };
   const secAgo = Math.max(0, Math.round((Date.now() - stamp) / 1000));
   return (
@@ -48,7 +66,9 @@ export default function Live() {
           <select value={mock} onChange={(e) => setMock(e.target.value)} aria-label="Mock"><option value="">All mocks</option>{d.byMock.map((m) => <option key={m.name}>{m.name}</option>)}</select>
           <select value={sort} onChange={(e) => setSort(e.target.value)} aria-label="Sort"><option value="left">Least time left first</option><option value="progress">Most answered first</option><option value="started">Started earliest first</option></select>
         </div>
-        {!rows.length ? <Empty>{n ? 'No one matches those filters.' : 'No one is taking a test right now.'}</Empty> : <div style={{ overflowX: 'auto' }}><table className="ad-table"><thead><tr><th>Student</th><th>Mock</th><th>Section</th><th>Answered</th><th className="num">Time left</th><th>Started</th><th /></tr></thead>
+        <div className="ad-toolbar" style={{ padding: '0 14px 10px' }}><div className="dash-seg" role="group" aria-label="View">{[['floor', 'Floor view'], ['table', 'Table']].map(([k, l]) => <button key={k} className={view === k ? 'on' : ''} aria-pressed={view === k} onClick={() => pick(k)}>{l}</button>)}</div>{view === 'floor' && <span className="fl-key small muted"><i className="ok" /> Working <i className="warn" /> Closing soon or quiet <i className="bad" /> Timer ended or leaving the tab</span>}</div>
+        {view === 'floor' && rows.length > 0 && <Floor rows={rows} d={d} left={left} />}
+        {view === 'table' && !rows.length ? <Empty>{n ? 'No one matches those filters.' : 'No one is taking a test right now.'}</Empty> : view === 'table' ? <div style={{ overflowX: 'auto' }}><table className="ad-table"><thead><tr><th>Student</th><th>Mock</th><th>Section</th><th>Answered</th><th className="num">Time left</th><th>Started</th><th /></tr></thead>
           <tbody>{rows.map((a) => { const l = left(a); return (
             <tr key={a.id}>
               <td className="nm"><Link to={`/admin/users/${a.userId}`}><b>{a.user}</b></Link><small>{a.contact}</small></td>
@@ -58,7 +78,7 @@ export default function Live() {
               <td className="num">{a.overtime ? <Badge tone="bad">Timer ended</Badge> : <span className={l != null && l <= 300 ? 'ad-warn-t' : ''}>{mmss(l)}</span>}</td>
               <td><small>{ago(a.startedAt)}</small></td>
               <td style={{ whiteSpace: 'nowrap' }}>{a.contact && <button className="btn btn-ghost btn-sm" onClick={() => copy(a.contact)} title="Copy contact">Copy contact</button>} <Link className="btn btn-ghost btn-sm" to={`/admin/users/${a.userId}`}>Profile</Link></td>
-            </tr>); })}</tbody></table></div>}
+            </tr>); })}</tbody></table></div> : !rows.length && <Empty>{n ? 'No one matches those filters.' : 'No one is taking a test right now.'}</Empty>}
       </div>
 
       <div className="ad-grid g-main" style={{ marginTop: 14 }}>

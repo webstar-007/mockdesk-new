@@ -214,3 +214,6 @@ Help is one search box. Ask about people (by name or email), lists (top, lowest,
 
 ## v28: Load test, up to 10,000 students
 Setup is four steps (scenario, size and length, what students do, pass/fail targets) with Advanced collapsed. **Limits** (top right) sets the largest students, length, warm-up, steps and custom requests the form accepts; the ceiling is 10,000 students and 24 hours. Scenario cards include ones sized from your real students and biggest batch. The live view shows p95/p99, failures, requests waiting, meters, charts and a filterable feed. In Saved results or a report choose **Use as baseline**; later reports show how they compare with it.
+
+## v29: Interactive layer
+Live tests: choose Floor view (tiles that glow when a student needs a look) or Table. Teachers: batch pages have a heat map of students by topic. Students can customize the dashboard (Customize layout) and the quick-action button. Deleting a saved load test or preset can be undone for 7 seconds.

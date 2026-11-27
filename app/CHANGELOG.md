@@ -1,5 +1,11 @@
 # What's new in MockDesk
 
+## v29: Interactive layer
+**Students.** Animated result reveal (score ring, count-up, staggered stats, confetti only when the score beats the last attempt). A progress timeline ("Your journey") with a card per mock. The dashboard is now made of blocks you can reorder, fold or hide (Customize layout; saved on your device). A quick-action button whose shortcuts, order and side you choose.
+**Teachers.** Batch heat map (students by topic, tap a cell for detail). Progress rings on assignments. Removing an assignment now offers Undo. Toasts now show on teacher and student pages too (they had no host before).
+**Admin.** Live tests has a floor view: one tile per student with a progress ring that glows amber or red for closing soon, quiet or leaving the tab (server adds `lastSeen` and `leaves` to /admin/live). Load-test live view: count-up KPIs, mini sparklines, glowing meters and a feed that highlights new events. Undo on deleting saved load tests and presets.
+**Everywhere.** Undo toasts (`toast(msg, tone, {undo})` and `undoable()`), `Spark`, `Switch`, `ProgressRing`, `Reveal` helpers, skeleton loaders shaped like the dashboard and result page, button press feedback and a slight squeeze on touch screens, animated switches, tabs and checkboxes, smooth accordions. All of it stops under "reduce motion". Fixed the student top bar overflowing on phones.
+
 ## v28: Load test, up to 10,000 students
 **Clean setup.** One page in four steps: pick a scenario card, set size and length, switch on what students do (settings appear under each switch), set pass/fail targets. Timing, safety stop and notes sit under Advanced. A bar at the bottom shows the size, estimated requests and any blockers.
 **Scenarios.** Ten ready-made cards (quick check, normal class, live exam start, submit rush, find my limit, staircase, two batches, busy site, soak, biggest possible) plus cards sized from your real data: all your students, and your biggest batch.
