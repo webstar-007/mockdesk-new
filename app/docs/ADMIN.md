@@ -235,3 +235,7 @@ Server > Server tools > Load test. Step 1: pick what to test (live exam, sign-in
 ## v32: Readiness score
 
 The load test score is the average of the tested parts (waits and failures). Red caps it at 49, amber at 74, a server out of room at 74, a safety stop at 25. Bands: Excellent 90+, Good 75 to 89, Shaky 50 to 74, Poor under 50. Open How this score is worked out for each part's points.
+
+## v33: Quick starts and testing from your laptop
+
+Load test > New test shows four quick starts. **Test from my laptop** creates a script: download it, run `node mockdesk-loadtest.mjs` on your computer (Node 18 or newer), and watch the state on the page. Open the admin page from your public address first, because the script uses the address you are on. The result appears under Saved results and includes the round-trip time to your server. If the abuse page blocks your laptop's address, unblock it there.

@@ -93,3 +93,22 @@ test('load test score: one red or amber part caps it, and a clean run is not cap
   const halted = mk(100, 0, { stopped: 'safety' }); assert.ok(halted.score <= 25);
   assert.equal(bandOf(75), 'Good'); assert.equal(bandOf(74), 'Shaky');
 });
+
+test('load test from a laptop: the downloaded script runs against the server and saves a result', async () => {
+  const { spawn } = await import('node:child_process');
+  await call('boss', 'POST', '/auth/register', { name: 'Boss R', email: 'boss30r@example.com', password: 'password123' });
+  db.prepare("UPDATE users SET role='admin' WHERE email='boss30r@example.com'").run();
+  const bad = await call('boss', 'POST', '/admin/loadtest/remote', { test: 'browse', people: 5, seconds: 20, base: 'javascript:alert(1)' }); assert.equal(bad.status, 400);
+  const mk = await call('boss', 'POST', '/admin/loadtest/remote', { test: 'both', people: 6, seconds: 20, base }); assert.equal(mk.status, 200, mk.text);
+  assert.ok(mk.body.script.includes('"key"') && !mk.body.script.includes('__CFG__'));
+  assert.equal((await call('boss', 'GET', '/admin/loadtest/remote')).body.state, 'waiting');
+  const wrong = await fetch(`${base}/api/lt/join`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ key: 'nope' }) }); assert.equal(wrong.status, 401);
+  const f = path.join(os.tmpdir(), `lt-client-${Date.now()}.mjs`); fs.writeFileSync(f, mk.body.script);
+  const out = await new Promise((resolve) => { let o = ''; const c = spawn(process.execPath, [f]); c.stdout.on('data', (d) => { o += d; }); c.stderr.on('data', (d) => { o += d; }); c.on('close', (code) => resolve({ code, o })); });
+  fs.unlinkSync(f); assert.equal(out.code, 0, out.o); assert.ok(/Saved\. Open it/.test(out.o), out.o);
+  const st = (await call('boss', 'GET', '/admin/loadtest/remote')).body; assert.equal(st.state, 'done'); assert.ok(st.reportId);
+  const rep = (await call('boss', 'GET', `/admin/loadtest/report/${st.reportId}`)).body.report;
+  assert.ok(rep.remote && rep.kinds.login.n >= 6 && rep.areas.length >= 2 && rep.simple.title && rep.score >= 0, 'a normal result page can be built from the laptop measurements');
+  assert.equal(db.prepare("SELECT COUNT(*) c FROM users WHERE email LIKE '%@loadtest.invalid'").get().c, 0, 'temporary accounts removed');
+  const again = await fetch(`${base}/api/lt/join`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ key: mk.body.script.match(/"key": ?"([^"]+)"/)[1] }) }); assert.equal(again.status, 401, 'the key stops working once the test is over');
+});

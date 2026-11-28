@@ -1,5 +1,10 @@
 # What's new in MockDesk
 
+## v33: Test from your laptop, quick starts
+**Admin.** Load test > New test now opens with four one-click starts: Quick check (30 seconds), Exam-day check (type how many students you expect), Find my limit, and Test from my laptop. The full setup is still below.
+**Test from my laptop.** Choose sign-in rush, browsing or both, how many people (up to 500) and how long. Download a small script and run `node mockdesk-loadtest.mjs` on your own computer (Node 18 or newer, nothing to install). The requests cross your real internet, proxy and TLS. It prints a plain summary in the terminal and saves the same result page under Saved results, with your round-trip time shown so you can separate network from server. The script's key works once and stops after an hour. Temporary accounts are deleted afterwards, and the abuse limits do not throttle the script while it runs. Ctrl+C stops early and still saves a result.
+**Fixed.** The "safe up to" line is now labelled a rough guess unless the test measured a limit.
+
 ## v32: A load test score that means something
 **Admin.** The load test score is now a Readiness score with a grade word (Excellent 90+, Good 75 to 89, Shaky 50 to 74, Poor under 50). It is the average of what people actually felt (waits for the parts that were tested, and failed requests). A red part caps it at 49, an amber part at 74, a server that ran out of room at 74 and an emergency stop at 25, so the number can never look better than the colours. Processor, memory and disk no longer pull the score down unless the server ran out of room. "How this score is worked out" lists every part with its points. Small tests (under 30 people or 30 seconds) say so. The result also states how many people it can safely take. Older saved results are brought up to the new scoring when opened.
 **Fixed.** The "safe up to" estimate ignored browsing and admin tests and was never shown on the new result page.

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { api } from '../lib/api.js';
 import { Badge, ConfirmModal, Err, Loading, Stat, toast, undoable } from './ui.jsx';
 import { CountUp, Spark } from '../components/Motion.jsx';
+import { QuickStart, RemoteModal } from './LoadTestQuick.jsx';
 import { Charts, Compare, FOCUS, LiveFeed, Report, Results, SHAPES, TONE, bytes, kindLabel, ms, shapeName } from './LoadTestParts.jsx';
 
 const fmtN = (n) => Number(n || 0).toLocaleString('en-IN');
@@ -141,7 +142,7 @@ function Limits({ info, onClose, onSaved }) {
   );
 }
 
-function Setup({ info, d, form, set, setForm, onStart }) {
+function Setup({ info, d, form, set, setForm, onStart, onLaptop }) {
   const L = info.limits; const real = info.real || { students: 0, batches: [] }; const [adv, setAdv] = useState(false); const [showLimits, setShowLimits] = useState(false); const [pname, setPname] = useState(''); const [busy, setBusy] = useState(false); const [notes, setNotes] = useState(false); const [gonePre, setGonePre] = useState([]);
   const pages = form.pages || []; const custom = form.custom || []; const sub = form.submitAtEnd; const tg = form.targets || {}; const total = (form.users || 0) + (form.browsers || 0);
   const [pre, setPre] = useState(null); const cfgKey = JSON.stringify({ ...form, note: '', label: '' });
@@ -172,6 +173,8 @@ function Setup({ info, d, form, set, setForm, onStart }) {
         <div className="lx-top-r"><button className="btn btn-ghost btn-sm" onClick={() => setShowLimits((x) => !x)} aria-expanded={showLimits}>Limits</button><button className="btn btn-ghost btn-sm" onClick={() => setForm({ ...d.defaults, mockId: form.mockId })}>Reset</button></div></div>
       {showLimits && <Limits info={info} onClose={() => setShowLimits(false)} onSaved={() => { setShowLimits(false); d.reload(); }} />}
 
+      <QuickStart info={info} d={d} setForm={setForm} onStart={onStart} onLaptop={onLaptop} />
+      <h2 className="lx-or">Or set up your own test</h2>
       <Section n="1" title="What do you want to test?" sub="Pick the part of the site you are worried about.">
         <div className="lx-focus" role="radiogroup" aria-label="What to test">{FOCUS.map(([k, icon, name, text]) => <button key={k} type="button" role="radio" aria-checked={focus === k} className={`lx-fc ${focus === k ? 'on' : ''}`} onClick={() => pickFocus(k)}><span aria-hidden="true">{icon}</span><b>{name}</b><small>{text}</small></button>)}</div>
         {examish && <h4 className="lx-grp">Or start from a ready-made exam size</h4>}
@@ -303,7 +306,7 @@ function SignIn() {
 
 export default function LoadTest() {
   const [d, setD] = useState(null); const [err, setErr] = useState(''); const [form, setForm] = useState(null);
-  const [view, setView] = useState({ name: 'new' }); const [dlg, setDlg] = useState(false); const [busy, setBusy] = useState(false); const [e2, setE2] = useState('');
+  const [view, setView] = useState({ name: 'new' }); const [dlg, setDlg] = useState(false); const [lap, setLap] = useState(false); const [busy, setBusy] = useState(false); const [e2, setE2] = useState('');
   const timer = useRef(null); const wasRunning = useRef(false);
   const load = useCallback(() => api.get('/admin/loadtest').then((x) => { setD(x); setForm((f) => f || { ...x.defaults, mockId: x.info.mocks[0]?.id || '' }); }).catch((e) => setErr(e.message)), []);
   useEffect(() => { load(); }, [load]);
@@ -332,7 +335,7 @@ export default function LoadTest() {
       </div>
       {tab === 'new' && <>
         {run?.error && <div className="alert" role="alert">The last test could not run: {run.error}</div>}
-        <Setup info={info} d={d} form={form} set={set} setForm={setForm} onStart={() => setDlg(true)} />
+        <Setup info={info} d={d} form={form} set={set} setForm={setForm} onStart={() => setDlg(true)} onLaptop={() => setLap(true)} />
         <div className="ad-grid g4" style={{ margin: '12px 0' }}>
           <Stat icon="🖥" label="Server" value={`${info.cpus} CPU`} sub={info.cpuModel.slice(0, 32)} /><Stat icon="🧠" label="Memory free" value={bytes(info.availMem)} sub={`of ${bytes(info.totalMem)}`} />
           <Stat icon="📀" label="Disk free" value={bytes(info.disk?.free)} sub={info.disk ? `${info.disk.usedPct}% used` : ''} /><Stat icon="🗄" label="Database size" value={bytes(info.dbBytes)} />
@@ -343,6 +346,7 @@ export default function LoadTest() {
       {view.name === 'list' && <Results baselineId={d.baselineId} h={hist} onOpen={openReport} onCompare={compare} onChanged={load} onRerunId={rerunId} />}
       {view.name === 'report' && <Report rep={view.rep} baselineId={d.baselineId} vs={view.vs} onBaseline={setBase} prevId={prev?.id} onAgain={() => setView({ name: 'new' })} onRerun={rerun} onCompare={compare} onChanged={() => { load(); openReport(view.id); }} />}
       {view.name === 'compare' && <Compare a={view.data.a} b={view.data.b} cmp={view.data} onBack={() => setView({ name: 'list' })} onSwap={() => compare(view.data.b.id, view.data.a.id)} />}
+      {lap && <RemoteModal onClose={() => setLap(false)} onOpen={(id) => { load(); openReport(id); }} />}
       {dlg && <ConfirmModal title={`Run a ${lenText(form.durationSec)} test with ${fmtN(['exam', 'results', 'mixed'].includes(form.focus || 'exam') ? form.users + (form.browsers || 0) + (form.staff || 0) : form.users)} ${['exam', 'results', 'mixed'].includes(form.focus || 'exam') ? 'students' : 'people'}?`} word="start" label="Start test" busy={busy} error={e2} onClose={() => setDlg(false)} onConfirm={start}>
         <p>The server will work hard for about {lenText(form.durationSec + 15)}. Pages may feel slower for anyone else using it. The virtual accounts and their data are removed when it ends, and the result is saved so you can compare it later.</p></ConfirmModal>}
     </section>

@@ -3,6 +3,7 @@
 // Everything the test creates is removed afterwards.
 import fs from 'node:fs';
 import os from 'node:os';
+import { CLIENT } from './ltclient.js';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { performance, monitorEventLoopDelay } from 'node:perf_hooks';
@@ -274,7 +275,8 @@ export function simpleOf(rep) {
   // the capacity answer matters more than the score: how many people can it take?
   let room = ''; const cap = rep.measuredLimit && rep.measuredLimit.users > 0 ? rep.measuredLimit.users : rep.estimate;
   if (rep.measuredLimit && rep.measuredLimit.users === 0) room = 'It struggled even with the smallest group.';
-  else if (cap) room = `Safe up to about ${Number(cap).toLocaleString()} people${rep.measuredLimit?.atLeast ? ' or more' : ''}${rep.stopped === 'safety' ? ' (the test was stopped early, so treat this as a guess)' : ''}.`;
+  else if (rep.measuredLimit && rep.measuredLimit.users > 0) room = `Stayed healthy up to ${Number(rep.measuredLimit.users).toLocaleString()} people${rep.measuredLimit.atLeast ? ' or more' : ''}.`;
+  else if (cap) room = `Rough guess from how hard the processor worked: about ${Number(cap).toLocaleString()} people. Run a bigger test to confirm.`;
   else if (level !== 'bad') room = 'The server barely noticed this load. Run a bigger test to find its limit.';
   const note = d.small ? 'This was a small test. A good result here does not prove it copes with a real crowd. Try a larger group or a longer run.' : '';
   return { level, title, text, room, note, numbers, fixes };
@@ -324,7 +326,7 @@ export function compareOf(a, b) {
   return { rows, better, worse, headline, lines, sameSetup, diffs, caution: sameSetup ? '' : 'The two tests used different setups, so differences may come from the setup, not from the server.' };
 }
 
-export function mountLoadTest({ r, db, now, audit, bad, settings, getMock, controls, jobs, hashPw, ltKey }) {
+export function mountLoadTest({ r, db, now, audit, bad, settings, getMock, controls, jobs, hashPw, ltKey, ltRouter }) {
   let cur = null; // the run in progress or the last one finished
   const file = () => dbFile(db);
 
@@ -562,6 +564,7 @@ export function mountLoadTest({ r, db, now, audit, bad, settings, getMock, contr
   function preflight(cfg) {
     const blockers = []; const warnings = []; const src = cfg.users > 0 ? pickSource(cfg.mockId) : null;
     if (isRunning()) blockers.push('A test is already running.');
+    if (remote.state === 'running') blockers.push('A test from your laptop is running. Wait for it to finish.');
     if (controls().maintenance.mode !== 'off') blockers.push('Maintenance mode is on. Turn it off first or the virtual students are blocked.');
     let snapKB = 0; let sections = 1;
     if (cfg.users > 0 && !src) blockers.push('Create a mock with at least 10 questions first, then run the test.');
@@ -672,5 +675,76 @@ export function mountLoadTest({ r, db, now, audit, bad, settings, getMock, contr
   });
   r.delete('/loadtest/presets/:id', (req, res) => { settings.set('loadtest_presets', presets().filter((x) => x.id !== req.params.id)); res.json({ ok: true, presets: presets() }); });
   r.delete('/loadtest/history', (req, res) => { saveReports(reports().filter((x) => x.pinned)); settings.set('loadtests', []); res.json({ ok: true }); });
+  // ---- (remote tests) ----
+  // ---- tests driven from the admin's own computer ----
+  // The admin downloads a small script. It runs on their laptop, so the requests cross the real internet, proxy and TLS.
+  // A one-time key (valid for an hour) lets it create temporary virtual accounts, then it posts the measurements back.
+  const remote = { hash: null, exp: 0, cfg: null, state: 'idle', runId: '', joinedAt: 0, reportId: '', sampler: null, timer: null, peaks: null, from: '' };
+  const sha = (k) => crypto.createHash('sha256').update(String(k)).digest();
+  const keyOk = (k) => !!remote.hash && now() < remote.exp && typeof k === 'string' && k.length < 100 && crypto.timingSafeEqual(sha(k), remote.hash);
+  const remoteStop = () => { clearInterval(remote.sampler); clearTimeout(remote.timer); remote.sampler = null; remote.timer = null; ltKey.remote = ''; ltKey.remoteExp = 0; remote.hash = null; try { cleanup(); } catch { /* removed on the next start */ } };
+  const remoteView = () => { if (remote.state === 'waiting' && now() > remote.exp) { remote.state = 'idle'; remoteStop(); } return { state: remote.state, cfg: remote.cfg, expiresAt: remote.exp, joinedAt: remote.joinedAt, reportId: remote.reportId, from: remote.from }; };
+  const num = (v, lo, hi, d = 0) => { const n = Number(v); return Number.isFinite(n) ? Math.min(hi, Math.max(lo, n)) : d; };
+  r.get('/loadtest/remote', (req, res) => res.json(remoteView()));
+  r.delete('/loadtest/remote', (req, res) => { remoteStop(); remote.state = 'idle'; res.json({ ok: true }); });
+  r.post('/loadtest/remote', (req, res) => {
+    if (isRunning()) return bad(res, 'A test is already running.');
+    if (remote.state === 'running') return bad(res, 'A laptop test is running right now.');
+    const b = req.body || {}; const test = ['signin', 'browse', 'both'].includes(b.test) ? b.test : 'browse';
+    const base = String(b.base || `${req.protocol}://${req.get('host')}`).replace(/\/+$/, ''); if (!/^https?:\/\/[A-Za-z0-9.\-:\[\]]+$/.test(base)) return bad(res, 'Give the public address of this site, such as https://mocks.example.com');
+    const cfg = { test, people: Math.round(num(b.people, 1, 500, 100)), seconds: Math.round(num(b.seconds, 20, 300, 60)), base };
+    const key = crypto.randomBytes(18).toString('base64url'); remote.hash = sha(key); remote.exp = now() + 3600000; remote.cfg = cfg; remote.state = 'waiting'; remote.reportId = ''; remote.joinedAt = 0; remote.from = ''; remote.admin = req.user;
+    ltKey.remote = key; ltKey.remoteExp = remote.exp;
+    audit(req, 'loadtest_remote', `${cfg.people} people from a laptop (${test})`);
+    res.json({ ok: true, filename: 'mockdesk-loadtest.mjs', expiresAt: remote.exp, cfg, script: CLIENT.replace('__CFG__', JSON.stringify({ ...cfg, key })) });
+  });
+  const joinUsers = (cfg, rid) => {
+    const t = now(); const PW = `lt-${crypto.randomBytes(5).toString('hex')}`; const salt = crypto.randomBytes(8).toString('hex'); const hash = cfg.test !== 'browse' && hashPw ? hashPw(PW, salt) : 'x';
+    const insU = db.prepare('INSERT INTO users(name,email,salt,hash,role,created_at,last_seen) VALUES (?,?,?,?,?,?,?)'); const insS = db.prepare('INSERT INTO sessions(id,user_id,expires_at,ip,ua,created_at) VALUES (?,?,?,?,?,?)'); const out = [];
+    db.exec('BEGIN');
+    try { for (let i = 0; i < cfg.people; i++) { const email = `lt-r${rid}-${i}@loadtest.invalid`; const uid = Number(insU.run(`Laptop test ${i + 1}`, email, salt, hash, null, new Date(t).toISOString(), t).lastInsertRowid); const sid = crypto.randomBytes(32).toString('hex'); insS.run(sid, uid, t + 3600000, '127.0.0.1', 'loadtest', t); out.push({ email, sid }); } db.exec('COMMIT'); }
+    catch (e) { try { db.exec('ROLLBACK'); } catch { /* */ } throw e; }
+    return { users: out, password: PW };
+  };
+  ltRouter?.post('/join', (req, res) => {
+    const b = req.body || {}; if (!keyOk(b.key)) return res.status(401).json({ error: 'This test key is wrong or has expired. Create a new script in the admin page.' });
+    if (remote.state !== 'waiting') return res.status(409).json({ error: remote.state === 'running' ? 'This script was already used. Create a new one.' : 'No laptop test is waiting. Create a script in the admin page.' });
+    if (isRunning()) return res.status(409).json({ error: 'Another load test is running on the server. Try again when it ends.' });
+    try {
+      const rid = crypto.randomBytes(3).toString('hex'); const j = joinUsers(remote.cfg, rid);
+      remote.state = 'running'; remote.runId = rid; remote.joinedAt = now(); remote.from = String(req.ip || '').replace(/^::ffff:/, ''); remote.client = { os: String(b.os || '').slice(0, 40), node: String(b.node || '').slice(0, 20), rtt: num(b.rtt, 0, 60000) };
+      const pk = remote.peaks = { cpuProc: 0, memUsedPct: 0, lagMs: 0, rss: 0, heap: 0 }; let lastCpu = process.cpuUsage(); let lastAt = performance.now();
+      remote.sampler = setInterval(() => { const t = performance.now(); const c = process.cpuUsage(lastCpu); const wall = Math.max(1, t - lastAt); pk.cpuProc = Math.max(pk.cpuProc, r1(((c.user + c.system) / 1000 / wall) * 100)); pk.lagMs = Math.max(pk.lagMs, Math.max(0, wall - 1000)); lastCpu = process.cpuUsage(); lastAt = t; const m = memInfo(); pk.memUsedPct = Math.max(pk.memUsedPct, r1((1 - m.avail / m.total) * 100)); const mu = process.memoryUsage(); pk.rss = Math.max(pk.rss, mu.rss); pk.heap = Math.max(pk.heap, mu.heapUsed); }, 1000);
+      remote.timer = setTimeout(() => { if (remote.state === 'running') { remote.state = 'expired'; remoteStop(); } }, (remote.cfg.seconds + 240) * 1000);
+      res.json({ runId: rid, ...j, pages: PAGES.filter((x) => ['me', 'mocks', 'announcements', 'inbox', 'assignments', 'stats', 'practice', 'config'].includes(x[0])).map((x) => x[2]), config: remote.cfg });
+    } catch (e) { remoteStop(); remote.state = 'idle'; res.status(500).json({ error: `Could not create the test accounts: ${e.message}` }); }
+  });
+  ltRouter?.post('/finish', (req, res) => {
+    const b = req.body || {}; if (!keyOk(b.key) && !(remote.state === 'running' && ltKey.remote === b.key)) return res.status(401).json({ error: 'This test key is wrong or has expired.' });
+    if (remote.state !== 'running') return res.status(409).json({ error: 'No laptop test is running.' });
+    try {
+      const x = b.result || {}; const cfgIn = remote.cfg; const kinds = {}; let n = 0, e = 0;
+      for (const [k, v] of Object.entries(x.kinds || {}).slice(0, 40)) { if (!/^(login|page:\/[A-Za-z0-9_\/\-]*)$/.test(k)) continue; const c = { n: num(v?.n, 0, 1e7), errors: num(v?.err, 0, 1e7), p50: r1(num(v?.p50, 0, 1e6)), p95: r1(num(v?.p95, 0, 1e6)), p99: r1(num(v?.p99, 0, 1e6)), max: r1(num(v?.max, 0, 1e6)) }; c.avg = c.p50; kinds[k] = c; n += c.n; e += c.errors; }
+      if (!n) { remote.state = 'idle'; remoteStop(); return res.status(400).json({ error: 'The script sent no measurements.' }); }
+      const pg = x.pages && num(x.pages.n, 0, 1e7) ? { n: num(x.pages.n, 0, 1e7), p50: r1(num(x.pages.p50, 0, 1e6)), p95: r1(num(x.pages.p95, 0, 1e6)), max: r1(num(x.pages.max, 0, 1e6)) } : null;
+      const all = x.all || {}; const secs = Math.round(num(x.seconds, 1, 3600, cfgIn.seconds)); const login = kinds.login;
+      const cfg = parseCfg({ focus: cfgIn.test === 'signin' ? 'signin' : 'browse', users: cfgIn.people, durationSec: Math.max(10, secs), pattern: 'steady', signinPerMin: cfgIn.test === 'browse' ? 0 : cfgIn.test === 'both' ? 1 : 4 }); cfg.label = 'From my laptop';
+      const core = Object.entries(kinds).reduce((a, [, v]) => a + v.errors, 0);
+      const samples = (Array.isArray(x.samples) ? x.samples : []).slice(0, 400).map((q) => ({ t: num(q.t, 0, 1e5), users: num(q.users, 0, 1e4), rps: num(q.rps, 0, 1e6), p95: r1(num(q.p95, 0, 1e6)), errors: num(q.err, 0, 1e7), phase: 'running', cpu: 0, mem: 0 }));
+      const pk = remote.peaks || {}; const m = memInfo(); const dk = diskOf(dbFile(db));
+      const rep = {
+        id: remote.runId, at: remote.joinedAt, config: cfg, stopped: x.stopped ? 'user' : '', stopReason: x.stopped ? 'You stopped the script early.' : '', durationSec: secs,
+        totals: { customErrors: 0, coreErrorPct: n ? r1((core / n) * 100) : 0, requests: n, errors: e, errorPct: n ? r1((e / n) * 100) : 0, p50: r1(num(all.p50, 0, 1e6)), p95: r1(num(all.p95, 0, 1e6)), p99: r1(num(all.p99, 0, 1e6)), max: r1(num(all.max, 0, 1e6)), peakRps: samples.reduce((a, q) => Math.max(a, q.rps), 0), avgRps: r1(n / Math.max(1, secs)), busy: 0 },
+        kinds, pages: pg, admin: null, errors: {}, peaks: { cpuProc: pk.cpuProc || 0, cpuSys: 0, rss: pk.rss || 0, heap: pk.heap || 0, memUsedPct: pk.memUsedPct || 0, diskUsedPct: dk.usedPct || 0, writeMs: 0, lagMs: pk.lagMs || 0, rps: 0, rssMB: Math.round((pk.rss || 0) / MB), heapMB: Math.round((pk.heap || 0) / MB) }, dbGrowthMB: 0, snapshotKB: 0,
+        server: { cpus: os.cpus().length, totalMem: m.total, node: process.version, mock: '' }, remote: { from: remote.from, os: String(x.os || remote.client?.os || ''), node: String(x.node || remote.client?.node || ''), rttMs: r1(num(x.rtt, 0, 60000)) },
+      };
+      rep.label = cfg.label; rep.verdict = verdictOf(rep); rep.advice = adviceOf(rep); rep.marks = []; rep.events = [{ t: 0, text: `Test started from ${remote.from || 'your laptop'}.`, level: 'info' }, { t: secs, text: x.stopped ? 'You stopped the script early.' : 'Test finished.', level: 'info' }];
+      rep.moments = { firstSlowAt: null, firstSlowUsers: null, slowestAt: null, slowestP95: null, slowestUsers: null }; rep.baseline = { rssMB: 0 }; rep.curve = []; rep.measuredLimit = null; rep.steps = []; rep.targets = targetsOf(rep); rep.samples = samples;
+      const base_ = Math.max(1, rep.peaks.cpuProc); rep.estimate = rep.stopped ? null : base_ < 8 ? null : Math.floor(cfg.browsers * Math.min(2.5, 70 / base_));
+      finishReport(rep); rep.note = `Measured from a laptop. Times include the internet between it and the server (round trip about ${rep.remote.rttMs} ms).`;
+      saveReports([rep, ...reports()]); remote.reportId = rep.id; remote.state = 'done'; remoteStop(); audit({ user: remote.admin }, 'loadtest_remote_done', `${cfgIn.people} people, score ${rep.score}`);
+      res.json({ id: rep.id, score: rep.score, band: rep.scoreWhy.band, title: rep.simple.title, text: rep.simple.text, room: rep.simple.room, fixes: rep.simple.fixes, areas: rep.areas.map(({ label, value, status, say }) => ({ label, value, status, say })) });
+    } catch (err) { remote.state = 'idle'; remoteStop(); res.status(500).json({ error: `Could not build the result: ${err.message}` }); }
+  });
   return { cleanup, running: () => !!cur && !['done', 'failed'].includes(cur.phase) };
 }

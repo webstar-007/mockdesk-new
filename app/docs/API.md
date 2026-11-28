@@ -172,3 +172,8 @@ Load test v28: `GET/PUT /admin/loadtest/limits` (PUT `{reset:true}` restores def
 
 ### v32
 - Load test reports gain `scoreWhy` (`score`, `band`, `mean`, `caps`, `small`, `parts`) and `scoreV: 2`. `score` is the Readiness score (0 to 100). Older reports are rescored when read.
+
+### v33 laptop load test
+- `POST /admin/loadtest/remote {test: signin|browse|both, people (1-500), seconds (20-300), base}` returns the script (`script`, `filename`, `expiresAt`). `GET /admin/loadtest/remote` returns `state` (`idle`, `waiting`, `running`, `done`, `expired`) and `reportId`. `DELETE /admin/loadtest/remote` cancels.
+- Key-protected, used by the script: `POST /api/lt/join {key}` creates temporary accounts and returns sessions and page paths; `POST /api/lt/finish {key, result}` saves the report and removes the accounts. The key is single-use and valid for one hour. The key header `x-loadtest` bypasses the per-IP limits for that run only.
+- Reports from a laptop carry `remote: {from, os, node, rttMs}`.

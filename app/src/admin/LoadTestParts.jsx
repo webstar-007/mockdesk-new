@@ -182,6 +182,7 @@ export function Report({ rep, onAgain, onRerun, onCompare, onChanged, prevId, ba
         </div>
       </div>
 
+      {rep.remote && <p className="lt-note small">💻 Measured from your laptop ({rep.remote.from || 'unknown address'}, round trip to the server about {rep.remote.rttMs} ms). These times include your internet connection, so they show what a real student on a similar connection would see.</p>}
       {sm.note && <p className="lt-note small">{sm.note}</p>}
       {rep.scoreWhy && <details className="lt-why"><summary>How this score is worked out</summary>
         <p>The score is the average of the parts that were tested ({rep.scoreWhy.mean}). A part scores 100 when it is instant, about 85 at the edge of good, 70 at the edge of fine, and falls quickly after that.{rep.scoreWhy.caps.length ? ` It is held down to ${Math.min(...rep.scoreWhy.caps.map((x) => x.at))} because ${rep.scoreWhy.caps.map((x) => x.why).join(' and ')}.` : ' Nothing held it back.'}</p>

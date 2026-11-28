@@ -77,7 +77,7 @@ export function cleanQuestion(body, { partial = false, strictOptions = false } =
   return { section, q, errors };
 }
 
-export function adminRouter({ ltKey, abuse, v24, tips, assign, exitFn, drafter = null, db, now, invalidate, getMock, readResult, hashPw, settings, notifier, features, features2, runReminders, exams, mailer = null, jobs, metrics, controls, creds, live, otpSender, whatsapp = null }) {
+export function adminRouter({ ltKey, ltRouter, abuse, v24, tips, assign, exitFn, drafter = null, db, now, invalidate, getMock, readResult, hashPw, settings, notifier, features, features2, runReminders, exams, mailer = null, jobs, metrics, controls, creds, live, otpSender, whatsapp = null }) {
   const r = express.Router();
   // Admins can do everything. Staff (role "editor") get the content tools plus whatever permissions an admin ticked for them.
   r.use((req, res, next) => {
@@ -770,7 +770,7 @@ export function adminRouter({ ltKey, abuse, v24, tips, assign, exitFn, drafter =
   qx = mountAdminExtras({ r, db, now, audit, bad, results, settings, notifier, features, runReminders, page });
   mountAlertCentre({ r, db, now, audit, bad, settings, notifier, mailer, whatsapp, jobs, recentErrors, qx, assign, exams, BUILTIN_ID, runBuild, bust });
   mountHelp({ r, db, now, audit, bad, jobs });
-  mountLoadTest({ r, db, now, audit, bad, settings, getMock, controls, jobs, hashPw, ltKey });
+  mountLoadTest({ r, db, now, audit, bad, settings, getMock, controls, jobs, hashPw, ltKey, ltRouter });
   mountTeam({ r, db, now, audit, bad, jobs });
   mountAdministrators({ r, db, now, audit, bad, settings, notifier, jobs });
   v24.mountAdmin({ r, audit, bad });

@@ -24,7 +24,7 @@ export function cleanConfig(raw, base = DEFAULTS) {
 }
 const same = (ip, rule) => !!ip && (rule.endsWith('*') ? String(ip).replace(/^::ffff:/, '').startsWith(rule.slice(0, -1)) : String(ip).replace(/^::ffff:/, '') === rule);
 
-export function makeAbuse({ now = Date.now, settings, db }) {
+export function makeAbuse({ now = Date.now, settings, db, skip }) {
   let cfg = cleanConfig(settings.get('abuse_config', {}));
   const hosts = new Map(); const events = []; const series = new Map(); // series: minute -> {n, t, b}
   let blocks = (settings.get('abuse_blocks', []) || []).filter((b) => !b.until || b.until > now());
@@ -55,6 +55,7 @@ export function makeAbuse({ now = Date.now, settings, db }) {
   const removeBlock = (ip) => { const n = blocks.length; blocks = blocks.filter((b) => b.ip !== ip); if (blocks.length !== n) { saveBlocks(); log({ ip, kind: 'unblock', detail: 'Block removed' }); } return n !== blocks.length; };
 
   const middleware = (req, res, next) => {
+    if (skip && skip(req)) return next();
     const ip = String(req.ip || '').replace(/^::ffff:/, ''); if (!ip) return next();
     const t = now(); const m = minute(); const path = req.path;
     const sm = series.get(m) || series.set(m, { n: 0, t: 0, b: 0 }).get(m); sm.n++;
