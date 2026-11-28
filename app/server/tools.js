@@ -15,10 +15,20 @@ const DAY = 86400000;
 const fsize = (f) => { try { return fs.statSync(f).size; } catch { return 0; } };
 const canRestart = () => process.env.MOCKDESK_RESTART !== 'off' && !!(process.env.INVOCATION_ID || process.env.MOCKDESK_SUPERVISED === '1' || process.env.pm_id || process.env.KUBERNETES_SERVICE_HOST);
 
+const AUD = (label) => { const l = label.toLowerCase(); return /student/.test(l) ? 'students' : /teacher/.test(l) ? 'teachers' : /admin|operator|owner/.test(l) ? 'admin' : /fix|bug/.test(l) ? 'fixed' : /everywhere|all users|everyone|platform/.test(l) ? 'everywhere' : 'other'; };
+// Each version in CHANGELOG.md has an intro line and paragraphs that start with a bold label, for example "**Students.** text".
+export function parseChangelog(md) {
+  return md.split(/^## /m).slice(1).map((blk) => {
+    const [head, ...rest] = blk.split('\n'); const [v, ...t] = head.split(':'); const items = []; const intro = [];
+    for (const line of rest.map((x) => x.trim()).filter(Boolean)) {
+      const m = line.match(/^\*\*(.+?)\.?\*\*\s*(.*)$/);
+      if (m) items.push({ label: m[1].replace(/\.$/, ''), tag: AUD(m[1]), text: m[2] }); else if (items.length) items[items.length - 1].text += ' ' + line; else intro.push(line);
+    }
+    return { version: v.trim(), title: t.join(':').trim(), text: rest.join('\n').trim(), intro: intro.join(' '), items };
+  });
+}
 function changelog() {
-  try {
-    return fs.readFileSync(path.join(ROOT, 'CHANGELOG.md'), 'utf8').split(/^## /m).slice(1).map((blk) => { const [head, ...rest] = blk.split('\n'); const [v, ...t] = head.split(':'); return { version: v.trim(), title: t.join(':').trim(), text: rest.join('\n').trim() }; });
-  } catch { return []; }
+  try { return parseChangelog(fs.readFileSync(path.join(ROOT, 'CHANGELOG.md'), 'utf8')); } catch { return []; }
 }
 const version = () => { try { return JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8')).version; } catch { return ''; } };
 
@@ -31,7 +41,7 @@ export function mountTools({ r, db, now, audit, bad, settings, exitFn = () => pr
       startedAt, uptimeSec: Math.round(process.uptime()), builtAt: fsize(dist) ? fs.statSync(dist).mtimeMs : null, pid: process.pid,
       cpus: os.cpus().length, load: os.loadavg().map((x) => Math.round(x * 100) / 100), totalMem: os.totalmem(), freeMem: os.freemem(), rss: process.memoryUsage().rss,
       canRestart: canRestart(), restartHint: canRestart() ? '' : 'This server is not running under a service manager, so it would not start again by itself. On your AWS server this works. Set MOCKDESK_SUPERVISED=1 if you run it under pm2, Docker or similar.',
-      database: { file: f ? path.basename(f) : 'memory', size: fsize(f), wal: fsize(f + '-wal') }, staged: !!(stagedPath(db) && fs.existsSync(stagedPath(db))), changelog: log.slice(0, 8),
+      database: { file: f ? path.basename(f) : 'memory', size: fsize(f), wal: fsize(f + '-wal') }, staged: !!(stagedPath(db) && fs.existsSync(stagedPath(db))), changelog: log.slice(0, 30), changelogTotal: log.length,
     });
   });
   r.post('/server/restart', (req, res) => {

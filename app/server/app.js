@@ -5,6 +5,7 @@ import { limitsOf, siteOf } from './lib/site.js';
 import compression from 'compression';
 import { permsOf } from './lib/perms.js';
 import { recordError, recentErrors } from './lib/health.js';
+import { makeAbuse } from './lib/abuse.js';
 import { makeControlsCache, makeMetrics, makeJobs, ipBlocked, emailAllowed } from './lib/controls.js';
 import { runBackup } from './ops.js';
 import { answerDoubt } from './lib/doubts.js';
@@ -78,9 +79,10 @@ export function createApp(db, { allowIncomplete = process.env.MOCKDESK_ALLOW_INC
   if (whatsapp === undefined) whatsapp = lazy(makeWhatsApp, live.env, ['WHATSAPP_PROVIDER', 'WHATSAPP_TOKEN', 'WHATSAPP_PHONE_ID', 'WHATSAPP_TEMPLATE', 'WHATSAPP_LANG', 'WHATSAPP_FROM', 'WHATSAPP_CONTENT_SID', 'TWILIO_ACCOUNT_SID', 'TWILIO_AUTH_TOKEN']);
   if (drafter === undefined) drafter = lazy(makeDrafter, live.env, ['AI_PROVIDER', 'ANTHROPIC_API_KEY', 'OPENAI_API_KEY', 'MOCKDESK_AI_MODEL'], ['ask']);
   const controls = makeControlsCache(settings, now); const metrics = makeMetrics(now); const jobs = makeJobs(now);
-  app.jobs = jobs; app.metrics = metrics;
+  app.jobs = jobs; app.metrics = metrics; const abuse = makeAbuse({ now, settings, db }); app.abuse = abuse;
   app.use('/api', metrics.middleware);
   app.use('/api', (req, res, next) => (ipBlocked(req.ip, controls().blockedIps) ? res.status(403).json({ error: 'Access from this network is blocked.', code: 'BLOCKED' }) : next()));
+  app.use('/api', abuse.middleware);
   const notifier = createNotifier({ db, now, settings, mailer, pusher: makePusher(settings, live.env), whatsapp });
   const cache = new Map();
   const invalidate = () => { cache.clear(); snaps.clear(); };
@@ -660,7 +662,7 @@ export function createApp(db, { allowIncomplete = process.env.MOCKDESK_ALLOW_INC
   jobs.reg('backup', 'Database backup', 'every 10 min (runs when due)', () => { const b = runBackup({ db, now, settings }); return b ? `Saved ${b.name}` : 'Not due yet'; });
   jobs.reg('assignments', 'Assignment reminders', 'every 10 min', async () => `Sent ${await assign.run()} reminder(s)`);
   jobs.reg('cleanup', 'Tidy expired sign-ins and codes', 'every 10 min', () => { const t = now(); db.prepare('DELETE FROM sessions WHERE expires_at<?').run(t); db.prepare("DELETE FROM otps WHERE expires_at<? AND expires_at>0").run(t - 86400000); db.prepare('DELETE FROM login_log WHERE at<?').run(t - 90 * 86400000); });
-  api.use('/admin', (req, res, next) => (['admin', 'editor'].includes(req.user.role) ? next() : res.status(403).json({ error: 'Admin access only' })), adminRouter({ v24, tips, assign, exitFn, drafter, db, now, invalidate, getMock, readResult, hashPw, iso, settings, notifier, features, features2, exams, runReminders: runRem, mailer, jobs, metrics, controls, creds, live, otpSender, whatsapp }));
+  api.use('/admin', (req, res, next) => (['admin', 'editor'].includes(req.user.role) ? next() : res.status(403).json({ error: 'Admin access only' })), adminRouter({ abuse, v24, tips, assign, exitFn, drafter, db, now, invalidate, getMock, readResult, hashPw, iso, settings, notifier, features, features2, exams, runReminders: runRem, mailer, jobs, metrics, controls, creds, live, otpSender, whatsapp }));
 
   api.use((req, res) => res.status(404).json({ error: 'Not found' }));
   app.use('/api', api);

@@ -45,6 +45,7 @@ const DataBackup = lazy(() => import('./DataBackup.jsx'));
 const ControlRoom = lazy(() => import('./ControlRoom.jsx'));
 const Monitoring = lazy(() => import('./Monitoring.jsx'));
 const Security = lazy(() => import('./Security.jsx'));
+const Abuse = lazy(() => import('./Abuse.jsx'));
 const Integrations = lazy(() => import('./Integrations.jsx'));
 const ServerTools = lazy(() => import('./ServerTools.jsx'));
 const Calendar = lazy(() => import('./Calendar.jsx'));
@@ -56,6 +57,7 @@ const Administrators = lazy(() => import('./Administrators.jsx'));
 const AuditPage = lazy(() => import('./Settings.jsx').then((m) => ({ default: m.AuditPage })));
 const Assignments = lazy(() => import('./Assignments.jsx'));
 import AlertBell from './AlertBell.jsx';
+import QuickActions from '../components/QuickActions.jsx';
 
 // Eight hubs instead of thirty tabs. Each hub groups related pages; every page keeps its own address.
 const HUBS = [
@@ -65,7 +67,7 @@ const HUBS = [
   { id: 'questions', label: 'Questions', icon: '❓', tabs: [['bank', 'Question bank'], ['content', 'Import and AI'], ['quality', 'Quality'], ['coverage', 'Coverage'], ['tricks', 'Tricks'], ['reports', 'Student reports']] },
   { id: 'insights', label: 'Insights', icon: '📊', tabs: [['analytics', 'Analytics'], ['ask', 'Ask your data'], ['integrity', 'Integrity']] },
   { id: 'comms', label: 'Messages', icon: '📣', tabs: [['support', 'Support inbox'], ['desk', 'Doubt desk'], ['messages', 'Send a message'], ['announcements', 'Announcements'], ['notifications', 'Reminder rules']] },
-  { id: 'server', label: 'Server', icon: '🖥', tabs: [['alerts', 'Alerts'], ['monitor', 'Monitoring'], ['tools', 'Server tools'], ['control', 'Control room'], ['security', 'Security'], ['integrations', 'Integrations'], ['data', 'Data and backup']] },
+  { id: 'server', label: 'Server', icon: '🖥', tabs: [['alerts', 'Alerts'], ['monitor', 'Monitoring'], ['tools', 'Server tools'], ['control', 'Control room'], ['security', 'Security'], ['abuse', 'Abuse and limits'], ['integrations', 'Integrations'], ['data', 'Data and backup']] },
   { id: 'help', label: 'Help', icon: '💬', tabs: [['help', 'Help']] },
   { id: 'settings', label: 'Settings', icon: '⚙', tabs: [['settings', 'Site configuration'], ['administrators', 'Administrators'], ['audit', 'Audit log']] },
 ];
@@ -144,6 +146,7 @@ export default function AdminApp() {
             <Route path="assignments" element={<Assignments />} />
             <Route path="monitor" element={<Monitoring />} />
             <Route path="security" element={<Security />} />
+            <Route path="abuse" element={<Abuse />} />
             <Route path="integrations" element={<Integrations />} />
             <Route path="bank" element={<Bank />} />
             <Route path="analytics" element={<Analytics />} />
@@ -167,6 +170,7 @@ export default function AdminApp() {
       </main>
       {find && <Search onClose={() => setFind(false)} />}
       <ToastHost />
+      <QuickActions role="admin" />
     </div>
   );
 }

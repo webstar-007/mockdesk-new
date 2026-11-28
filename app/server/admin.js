@@ -77,7 +77,7 @@ export function cleanQuestion(body, { partial = false, strictOptions = false } =
   return { section, q, errors };
 }
 
-export function adminRouter({ v24, tips, assign, exitFn, drafter = null, db, now, invalidate, getMock, readResult, hashPw, settings, notifier, features, features2, runReminders, exams, mailer = null, jobs, metrics, controls, creds, live, otpSender, whatsapp = null }) {
+export function adminRouter({ abuse, v24, tips, assign, exitFn, drafter = null, db, now, invalidate, getMock, readResult, hashPw, settings, notifier, features, features2, runReminders, exams, mailer = null, jobs, metrics, controls, creds, live, otpSender, whatsapp = null }) {
   const r = express.Router();
   // Admins can do everything. Staff (role "editor") get the content tools plus whatever permissions an admin ticked for them.
   r.use((req, res, next) => {
@@ -775,6 +775,20 @@ export function adminRouter({ v24, tips, assign, exitFn, drafter = null, db, now
   mountAdministrators({ r, db, now, audit, bad, settings, notifier, jobs });
   v24.mountAdmin({ r, audit, bad });
   mountTipsAdmin(r, tips, { db, now, audit, bad, jobs, settings });
+  // ----- rate limits and abuse -----
+  r.get('/abuse', (req, res) => res.json({ ...abuse.summary(), yourIp: String(req.ip || '').replace(/^::ffff:/, '') }));
+  r.put('/abuse/config', (req, res) => {
+    if (req.body?.reset) { abuse.resetConfig(); audit(req, 'abuse_config', '', 'reset to defaults'); return res.json({ config: abuse.config }); }
+    let c; try { c = abuse.setConfig(req.body); } catch (e) { return bad(res, e.message); }
+    audit(req, 'abuse_config', '', `${c.enabled ? 'on' : 'off'}, ${c.perIpPerMin}/min per address, auto-block ${c.autoBlock ? 'on' : 'off'}`); res.json({ config: c });
+  });
+  r.post('/abuse/block', (req, res) => {
+    const ip = String(req.body?.ip || '').trim(); const mins = Math.max(0, Math.min(525600, Number(req.body?.minutes) || 0));
+    if (ip === String(req.ip || '').replace(/^::ffff:/, '')) return bad(res, 'That is your own address. Blocking it would lock you out.');
+    let b; try { b = abuse.addBlock({ ip, minutes: mins, reason: String(req.body?.reason || ''), by: req.user.name }); } catch (e) { return bad(res, e.message); }
+    audit(req, 'abuse_block', ip, mins ? `${mins} min` : 'until removed'); res.json({ block: b });
+  });
+  r.post('/abuse/unblock', (req, res) => { const ip = String(req.body?.ip || '').trim(); if (!abuse.removeBlock(ip)) return bad(res, 'That address is not blocked.', 404); audit(req, 'abuse_unblock', ip); res.json({ ok: true }); });
   mountControl({ r, db, now, audit, bad, settings, notifier, mailer, creds, live, drafter, otpSender, whatsapp, jobs, metrics, controlsCache: controls, recentErrors });
   mountOps({ r, db, now, audit, bad, results, settings, notifier, page });
   mountTools({ r, db, now, audit, bad, settings, exitFn });

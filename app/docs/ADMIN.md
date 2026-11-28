@@ -217,3 +217,13 @@ Setup is four steps (scenario, size and length, what students do, pass/fail targ
 
 ## v29: Interactive layer
 Live tests: choose Floor view (tiles that glow when a student needs a look) or Table. Teachers: batch pages have a heat map of students by topic. Students can customize the dashboard (Customize layout) and the quick-action button. Deleting a saved load test or preset can be undone for 7 seconds.
+
+## v30: Question scores, abuse and limits, edge button
+
+**Question score.** Questions > Quality gives each question 0 to 100 (Good 80+, Fair 60 to 79, Poor below 60). Click the score for the lost points. Questions under 15 attempts are marked early read.
+
+**Abuse and limits.** Server > Abuse and limits. See traffic, the busiest addresses and anyone slowed down. Block an address for 15 minutes, 1 hour, 24 hours or until removed. Under Rules edit the limits, trusted addresses and auto-block. Admin pages are never throttled. Behind Nginx or Caddy set `MOCKDESK_TRUST_PROXY=1`.
+
+**What's new.** Server > Server tools > What's new: timeline, audience filters, search and copy buttons.
+
+**Edge button.** The lightning tab on the screen edge: drag to place, Alt+Q to open, 1 to 9 to pick, Customize for your own shortcuts. Saved per device.

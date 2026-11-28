@@ -159,3 +159,9 @@ Load test v25: `POST /admin/loadtest/preflight` (same body as start; returns `bl
 Help v26: `POST /admin/help/ask` now also returns `data` (`kind` profile|list|stats, `title`, `summary`, `stats`, `table`, `go`, `follow`) for data questions; `GET /admin/help/suggest?q=` returns type-ahead items.
 
 Load test v28: `GET/PUT /admin/loadtest/limits` (PUT `{reset:true}` restores defaults; 409 while a test runs), `PUT /admin/loadtest/baseline {id}`, `GET /admin/loadtest/report/:id/csv`. `GET /admin/loadtest/report/:id` returns `{report, baselineId, vsBaseline}`; `GET /admin/loadtest` includes `baselineId` and `info.ceil`, `info.real`; `/live` adds `totals`, `errors`, `setupPct`. Config gains `timeoutSec`.
+
+### v30
+- `GET /admin/abuse` (summary, addresses, events, `yourIp`), `PUT /admin/abuse/config` (`{reset:true}` restores defaults), `POST /admin/abuse/block {ip, minutes, reason}` (`minutes` 0 = until removed; own and trusted addresses refused), `POST /admin/abuse/unblock {ip}`.
+- Limited requests: 429 `{code:'RATE_LIMITED'}` with `Retry-After`. Blocked: 403 `{code:'BLOCKED'}`. `/admin/*` is counted, never throttled.
+- `GET /admin/quality?grade=good|fair|poor&sort=worst|score|best` adds `grades`, `avgScore`, `mockScores`, `sectionScores`; each question has `score`, `grade`, `scoreParts`, `disc`, `early`.
+- `GET /admin/server/info` returns `changelog` (latest 30 versions with tagged items) and `changelogTotal`.

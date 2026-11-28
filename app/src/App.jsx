@@ -50,7 +50,7 @@ const ViewAsBar = () => {
   return <div className="viewas-bar" role="status"><span><b>Viewing as {user?.name}.</b> {viewAs.by} is looking at this student’s screen. It is read-only, and nothing you open counts as the student being active.</span><button className="btn btn-sm" onClick={exit}>Exit and go back</button></div>;
 };
 function SiteFootText() { const site = useSite(); return <span><b>{site.name}</b>{site.footerText ? ` · ${site.footerText}` : site.tagline ? ` · ${site.tagline}` : ''}</span>; }
-const Shell = ({ children }) => (<><a className="skip" href="#main">Skip to content</a><ViewAsBar /><Header /><SoftNotice /><AnnouncementBar /><div className="shell" id="main"><StudentNav />{children ?? <Outlet />}<QuickActions /><ToastHost /><footer className="site-foot"><SiteFootText /><span><Link to="/">Dashboard</Link><Link to="/profile">Profile</Link></span></footer></div></>);
+const Shell = ({ children }) => (<><a className="skip" href="#main">Skip to content</a><ViewAsBar /><Header /><SoftNotice /><AnnouncementBar /><div className="shell" id="main"><StudentNav />{children ?? <Outlet />}<QuickActions role="student" /><ToastHost /><footer className="site-foot"><SiteFootText /><span><Link to="/">Dashboard</Link><Link to="/profile">Profile</Link></span></footer></div></>);
 
 // "/" is public: visitors see the landing page, signed-in students see their dashboard.
 function Root() {

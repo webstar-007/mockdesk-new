@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { api } from '../lib/api.js';
 import LoadTest from './LoadTest.jsx';
 import Health from './System.jsx';
+import WhatsNew, { newsSeen } from './WhatsNew.jsx';
 import { Badge, ConfirmModal, Empty, Err, Loading, PageHead, Stat, ago, dt, toast, useLoad } from './ui.jsx';
 
 const bytes = (b) => (b == null ? '–' : b > 1073741824 ? `${(b / 1073741824).toFixed(1)} GB` : b > 1048576 ? `${(b / 1048576).toFixed(1)} MB` : `${Math.max(0, Math.round(b / 1024))} KB`);
@@ -10,12 +11,13 @@ const span = (s) => { const d = Math.floor(s / 86400), h = Math.floor((s % 86400
 const TABS = [['overview', 'Health and restart'], ['database', 'Database'], ['logs', 'Logs'], ['load', 'Load test'], ['new', 'What’s new']];
 
 export default function ServerTools() {
-  const [tab, setTab] = useState('overview');
+  const [tab, setTab] = useState('overview'); const { data: info } = useLoad('/admin/server/info'); const [, bump] = useState(0);
+  const fresh = info?.changelog?.[0] && Number(String(info.changelog[0].version).replace(/\D/g, '')) > (Number(String(newsSeen()).replace(/\D/g, '')) || 0);
   return (
     <>
       <PageHead title="Server tools" sub="Check the server is healthy, restart the app, look after the database, read logs, and test how many students it can handle." />
-      <nav className="ad-tabs" aria-label="Server tools">{TABS.map(([k, l]) => <button key={k} type="button" className={tab === k ? 'on' : ''} aria-pressed={tab === k} onClick={() => setTab(k)}>{l}</button>)}</nav>
-      {tab === 'overview' && <Overview />}{tab === 'database' && <Database />}{tab === 'logs' && <Logs />}{tab === 'load' && <LoadTest />}{tab === 'new' && <WhatsNew />}
+      <nav className="ad-tabs" aria-label="Server tools">{TABS.map(([k, l]) => <button key={k} type="button" className={tab === k ? 'on' : ''} aria-pressed={tab === k} onClick={() => setTab(k)}>{l}{k === 'new' && fresh && <span className="wn-pip" aria-label="new" />}</button>)}</nav>
+      {tab === 'overview' && <Overview />}{tab === 'database' && <Database />}{tab === 'logs' && <Logs />}{tab === 'load' && <LoadTest />}{tab === 'new' && <WhatsNew onSeen={() => bump((n) => n + 1)} />}
     </>
   );
 }
@@ -94,7 +96,3 @@ function Logs() {
   );
 }
 
-function WhatsNew() {
-  const { data: d, err, loading } = useLoad('/admin/server/info'); if (loading && !d) return <Loading />; if (err) return <Err>{err}</Err>;
-  return <div className="ad-news">{d.changelog.map((c, i) => <section key={c.version} className="card"><h3>{c.version} {i === 0 && <Badge tone="brand">latest</Badge>}</h3><p className="muted" style={{ margin: 0 }}><b>{c.title}</b></p><p style={{ margin: '6px 0 0' }}>{c.text}</p></section>)}</div>;
-}

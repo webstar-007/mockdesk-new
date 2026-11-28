@@ -1,4 +1,5 @@
 // Admin routes added in v7: announcements, notifications, referrals, batches and the question quality report.
+import { scoreOf } from './lib/qscore.js';
 import crypto from 'node:crypto';
 import { AUDIENCES, audienceCount, audienceIds } from './lib/audience.js';
 import { DEFAULTS } from './lib/settings.js';
@@ -196,13 +197,14 @@ export function mountAdminExtras({ r, db, now, audit, bad, results, settings, no
     const agg = new Map(); const secTime = new Map();
     const all = [...results()]; const byMock = new Map();
     for (const { row, res: rs } of all) { const pc0 = rs.summary?.percentage; if (typeof pc0 === 'number') (byMock.get(row.mock_id) || byMock.set(row.mock_id, []).get(row.mock_id)).push(pc0); }
-    const topCut = new Map(); for (const [m, a] of byMock) if (a.length >= 8) { a.sort((x, y) => y - x); topCut.set(m, a[Math.max(0, Math.ceil(a.length * 0.25) - 1)]); }
+    const topCut = new Map(); const botCut = new Map(); for (const [m, a] of byMock) if (a.length >= 8) { a.sort((x, y) => y - x); topCut.set(m, a[Math.max(0, Math.ceil(a.length * 0.25) - 1)]); botCut.set(m, a[Math.min(a.length - 1, a.length - Math.ceil(a.length * 0.25))]); }
     for (const { row, res: rs } of all) for (const q of rs.questions || []) {
       if (q.qualifying || !Array.isArray(q.options)) continue;
-      const s = agg.get(q.id) || { id: q.id, n: 0, correct: 0, wrong: 0, skipped: 0, time: 0, dist: q.options.map(() => 0), key: q.correct, section: q.section, topic: q.topic, difficulty: q.difficulty || 'moderate', text: q.text, mockIds: new Set(), noExp: !q.explanation, topAtt: 0, topRight: 0 };
+      const s = agg.get(q.id) || { id: q.id, n: 0, correct: 0, wrong: 0, skipped: 0, time: 0, dist: q.options.map(() => 0), key: q.correct, section: q.section, topic: q.topic, difficulty: q.difficulty || 'moderate', text: q.text, mockIds: new Set(), noExp: !q.explanation, topAtt: 0, topRight: 0, botAtt: 0, botRight: 0 };
       s.n++; s.time += q.timeSec || 0; s.mockIds.add(row.mock_id);
       if (q.status === 'correct') s.correct++; else if (q.status === 'incorrect') s.wrong++; else s.skipped++;
       if (topCut.has(row.mock_id) && rs.summary?.percentage >= topCut.get(row.mock_id) && q.status !== 'skipped' && (q.status === 'correct' || q.status === 'incorrect')) { s.topAtt++; if (q.status === 'correct') s.topRight++; }
+      if (botCut.has(row.mock_id) && rs.summary?.percentage <= botCut.get(row.mock_id) && (q.status === 'correct' || q.status === 'incorrect')) { s.botAtt++; if (q.status === 'correct') s.botRight++; }
       if (Number.isInteger(q.selected) && q.selected < s.dist.length) s.dist[q.selected]++;
       agg.set(q.id, s);
       const st = secTime.get(q.section) || { n: 0, t: 0 }; st.n++; st.t += q.timeSec || 0; secTime.set(q.section, st);
@@ -228,8 +230,10 @@ export function mountAdminExtras({ r, db, now, audit, bad, results, settings, no
       if (secAvg && avgTime >= Math.max(60, secAvg * 2) && s.n >= 10) flags.push({ key: 'slow', label: 'Takes too long', detail: `${avgTime}s on average, against ${Math.round(secAvg)}s for its section.`, severity: 1 });
       if (s.noExp) flags.push({ key: 'no_explanation', label: 'No explanation', detail: 'Students see no solution for this question.', severity: 1 });
       for (const f of flags) if (!f.action) f.action = f.key === 'ambiguous' ? 'replace' : 'review';
+      const disc = s.topAtt >= 4 && s.botAtt >= 4 ? Math.round((s.topRight / s.topAtt - s.botRight / s.botAtt) * 100) / 100 : null;
+      const q100 = scoreOf({ flags, pctRight, disc, n: s.n, pctSkipped: pc(s.skipped) });
       const mockId = current.get(s.id); const liveIn = mockId || [...s.mockIds][0];
-      list.push({ id: s.id, text: String(s.text || '').slice(0, 140), section: s.section, topic: s.topic, difficulty: s.difficulty, mockId: mockId || null, mockName: mockName.get(liveIn) || liveIn, attempts: s.n, pctRight, pctWrong: pc(s.wrong), pctSkipped: pc(s.skipped), avgTimeSec: avgTime, sectionAvgSec: Math.round(secAvg), options: dist, keyIndex: s.key, reports: rep?.c || 0, flags, suggest: flags.some((f) => f.severity >= 2) ? (flags.some((f) => f.action === 'replace') ? 'replace' : 'review') : null, worst: Math.max(0, ...flags.map((f) => f.severity)) });
+      list.push({ id: s.id, text: String(s.text || '').slice(0, 140), section: s.section, topic: s.topic, difficulty: s.difficulty, mockId: mockId || null, mockName: mockName.get(liveIn) || liveIn, attempts: s.n, pctRight, pctWrong: pc(s.wrong), pctSkipped: pc(s.skipped), avgTimeSec: avgTime, sectionAvgSec: Math.round(secAvg), options: dist, keyIndex: s.key, reports: rep?.c || 0, flags, suggest: flags.some((f) => f.severity >= 2) ? (flags.some((f) => f.action === 'replace') ? 'replace' : 'review') : null, worst: Math.max(0, ...flags.map((f) => f.severity)), disc, score: q100.score, grade: q100.grade, scoreParts: q100.parts, early: s.n < 15 });
     }
     return list;
   };
@@ -237,9 +241,13 @@ export function mountAdminExtras({ r, db, now, audit, bad, results, settings, no
     const minN = Math.max(1, Math.min(200, Number(req.query.min) || 5)); const list = computeQuality(minN); const mockName = new Map(db.prepare('SELECT id, name FROM mocks').all().map((m) => [m.id, m.name]));
     const flag = String(req.query.flag || ''); const mock = String(req.query.mock || ''); const section = String(req.query.section || '');
     let out = list.filter((x) => (!flag || (flag === 'any' ? x.flags.length : x.flags.some((f) => f.key === flag))) && (!mock || x.mockId === mock) && (!section || x.section === section));
-    out.sort((a, b) => b.worst - a.worst || b.flags.length - a.flags.length || a.pctRight - b.pctRight);
+    const grade = String(req.query.grade || ''); if (grade) out = out.filter((x) => x.grade === grade);
+    const sort = String(req.query.sort || 'worst'); out.sort(sort === 'score' ? (a, b) => a.score - b.score || b.worst - a.worst : sort === 'best' ? (a, b) => b.score - a.score : (a, b) => b.worst - a.worst || b.flags.length - a.flags.length || a.pctRight - b.pctRight);
     const counts = {}; for (const x of list) for (const f of x.flags) counts[f.key] = (counts[f.key] || 0) + 1;
-    res.json({ total: list.length, flagged: list.filter((x) => x.worst >= 2).length, counts, minAttempts: minN, mocks: [...new Set(list.map((x) => x.mockId).filter(Boolean))].map((id) => ({ id, name: mockName.get(id) || id })), questions: out.slice(0, 200) });
+    const grades = { good: 0, fair: 0, poor: 0 }; for (const x of list) grades[x.grade]++; const avgScore = list.length ? Math.round(list.reduce((a, x) => a + x.score, 0) / list.length) : null;
+    const perMock = new Map(); for (const x of list) if (x.mockId) { const o = perMock.get(x.mockId) || { id: x.mockId, name: mockName.get(x.mockId) || x.mockId, n: 0, sum: 0, poor: 0 }; o.n++; o.sum += x.score; if (x.grade === 'poor') o.poor++; perMock.set(x.mockId, o); }
+    const bySection = {}; for (const x of list) { const o = bySection[x.section] || (bySection[x.section] = { n: 0, sum: 0 }); o.n++; o.sum += x.score; }
+    res.json({ total: list.length, grades, avgScore, mockScores: [...perMock.values()].map((o) => ({ id: o.id, name: o.name, n: o.n, poor: o.poor, score: Math.round(o.sum / o.n) })).sort((a, b) => a.score - b.score), sectionScores: Object.entries(bySection).map(([k, o]) => ({ section: k, n: o.n, score: Math.round(o.sum / o.n) })), flagged: list.filter((x) => x.worst >= 2).length, counts, minAttempts: minN, mocks: [...new Set(list.map((x) => x.mockId).filter(Boolean))].map((id) => ({ id, name: mockName.get(id) || id })), questions: out.slice(0, 200) });
   });
   mountCampaigns({ r, db, now, audit, bad, notifier });
   return mountAdminExtras2({ r, db, now, audit, bad, notifier, computeQuality, results, page });

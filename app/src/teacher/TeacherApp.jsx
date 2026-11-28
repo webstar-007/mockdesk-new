@@ -1,5 +1,6 @@
 import { useSite } from '../lib/site.js';
 import { ToastHost } from '../admin/ui.jsx';
+import QuickActions from '../components/QuickActions.jsx';
 import BrandMark from '../components/BrandMark.jsx';
 import { useEffect, useState } from 'react';
 import { Link, Navigate, Route, Routes, useLocation, useParams } from 'react-router-dom';
@@ -192,7 +193,7 @@ export default function TeacherApp() {
   const { user, logout } = useAuth();
   if (user?.role !== 'teacher') return <Navigate to="/" replace />;
   return (
-    <div className="tc"><ToastHost />
+    <div className="tc"><ToastHost /><QuickActions role="teacher" />
       <header className="topbar"><div className="topbar-in"><Link to="/teacher" className="brand"><BrandMark /><span>{site.name} <small className="muted">Teacher</small></span></Link><div className="topbar-user"><Link className="btn btn-ghost btn-sm" to="/teacher/health">Health</Link><Link className="btn btn-ghost btn-sm" to="/teacher/doubts">Doubts</Link><Link className="btn btn-ghost btn-sm" to="/teacher/assignments">Assignments</Link><Link className="btn btn-ghost btn-sm" to="/teacher/tricks">Tricks</Link><ThemeToggle /><span className="who">{user.name}</span><button className="btn btn-ghost btn-sm" onClick={logout}>Sign out</button></div></div></header>
       <main className="shell" id="main"><TeacherNav /><Routes><Route index element={<Batches />} /><Route path="assignments" element={<AssignmentList />} /><Route path="tricks" element={<Tricks />} /><Route path="health" element={<div><div className="pagehead"><div><h1>Batch health</h1><p className="muted small">Who is slipping in your batches. Nudge them in one click.</p></div></div><HealthBoard base="/teacher" /></div>} /><Route path="doubts" element={<div><div className="pagehead"><div><h1>Doubts</h1><p className="muted small">Questions your students ask from their review page.</p></div></div><DeskQueue base="/teacher" /></div>} /><Route path="assignments/:id" element={<AssignmentDetail />} /><Route path=":id" element={<Batch />} /><Route path=":id/:uid" element={<Student />} /><Route path="*" element={<Navigate to="/teacher" replace />} /></Routes></main>
     </div>

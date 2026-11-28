@@ -1,5 +1,11 @@
 # What's new in MockDesk
 
+## v30: Question scores, abuse dashboard, edge button
+**Admin.** Question quality now gives every question a score out of 100 with a Good, Fair or Poor grade, an average ring, per-mock bars, grade filters and a sort. Click a score to see the points lost and the separation index. New Server > Abuse and limits page: requests per minute, busiest addresses, slowed and blocked visitors, temporary or permanent blocks, editable limits (all, heavy downloads, sign-in), trusted addresses, optional auto-block, an event feed and a live refresh. Behind a proxy set `MOCKDESK_TRUST_PROXY=1`. What's new is redesigned as a timeline with audience filters, search, New badges and copy buttons.
+**Everywhere.** The quick-action button is now a slim tab on the screen edge. Drag it up or down (arrow keys work too), flip it to the other side, press Alt+Q to open it and 1 to 9 to pick. Students, teachers and admins each get their own shortcuts, and students see an unread Inbox badge.
+**Server.** New `GET /admin/abuse`, `PUT /admin/abuse/config`, `POST /admin/abuse/block`, `POST /admin/abuse/unblock`. Rate-limited requests answer 429 with `code: RATE_LIMITED` and Retry-After; blocked ones 403 `code: BLOCKED`. `/admin/quality` accepts `grade` and `sort`.
+**Fixed.** The question score breakdown crashed the Quality page.
+
 ## v29: Interactive layer
 **Students.** Animated result reveal (score ring, count-up, staggered stats, confetti only when the score beats the last attempt). A progress timeline ("Your journey") with a card per mock. The dashboard is now made of blocks you can reorder, fold or hide (Customize layout; saved on your device). A quick-action button whose shortcuts, order and side you choose.
 **Teachers.** Batch heat map (students by topic, tap a cell for detail). Progress rings on assignments. Removing an assignment now offers Undo. Toasts now show on teacher and student pages too (they had no host before).

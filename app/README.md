@@ -14,6 +14,7 @@ It is one Node.js program with a built-in SQLite database. No separate database 
 - **Batch health, Doubt desk, certificates and mock reminders (v24).**
 - **Administrators (v22):** invite or remove admins and staff, presets, rules, idle-staff lock, activity. Earlier (v20): team activity and branding.
 - **Team activity and branding (v20):** see who is signed in and what staff changed, lock accounts, and set your logo and colour.
+- **Question scores, abuse dashboard and edge button (v30):** 0 to 100 question scores, rate-limit and abuse page with blocking, redesigned What's new, draggable quick-action tab for every role.
 - **Alerts and assignments (v19):** alert bell with email/WhatsApp delivery, question quality loop, weekly auto-built mocks, teacher assignments with due dates and reminders. See docs/ADMIN.md.
 - **Admin tools (v18):** restart, database tools, restore, log viewer and version info (Server tools); release calendar; support inbox; view as student; per-person data download and erase; more bulk actions. See docs/ADMIN.md.
 - **Navigation:** every student, teacher and admin page (except the live exam) has Back and Forward buttons and a breadcrumb trail. Back goes to the previous page, or to the parent page when the visit started there. Alt + Left and Alt + Right work too.
