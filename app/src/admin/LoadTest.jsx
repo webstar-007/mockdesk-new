@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { api } from '../lib/api.js';
 import { Badge, ConfirmModal, Err, Loading, Stat, toast, undoable } from './ui.jsx';
 import { CountUp, Spark } from '../components/Motion.jsx';
-import { Charts, Compare, LiveFeed, Report, Results, SHAPES, TONE, bytes, kindLabel, ms, shapeName } from './LoadTestParts.jsx';
+import { Charts, Compare, FOCUS, LiveFeed, Report, Results, SHAPES, TONE, bytes, kindLabel, ms, shapeName } from './LoadTestParts.jsx';
 
 const fmtN = (n) => Number(n || 0).toLocaleString('en-IN');
 const clock = (sec) => { const s = Math.max(0, Math.round(sec || 0)); const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), x = s % 60; return h ? `${h}:${String(m).padStart(2, '0')}:${String(x).padStart(2, '0')}` : `${m}:${String(x).padStart(2, '0')}`; };
@@ -10,6 +10,16 @@ const lenText = (sec) => (sec >= 3600 && sec % 3600 === 0 ? `${sec / 3600} hour$
 const TARGETS = [['p95Ms', 'Autosave response time (ms, p95)', 'Most students should wait less than this.'], ['submitP95Ms', 'Submit response time (ms, p95)', 'The end-of-test rush.'], ['errorPct', 'Failed requests (%)', '0 means none allowed.'], ['cpuPct', 'App processor use (%)', 'Of one core.'], ['memPct', 'Server memory used (%)', ''], ['writeMs', 'Database write time (ms)', '']];
 const METHODS = ['GET', 'POST', 'PUT'];
 const WRITE_OK = /^\/(attempts\/\{attempt\}\/(integrity|errors\/[A-Za-z0-9_\-{}]+)|bookmarks|notebook|practice)(\/|$|\?)/;
+const FOCUS_CFG = {
+  exam: { focus: 'exam' },
+  results: { focus: 'results', users: 200, durationSec: 120, pattern: 'spike', progress: 80, saveEverySec: 30, submitAtEnd: true, submitSpreadPct: 10, resultPct: 100, reviewPct: 60, pdfPct: 30 },
+  signin: { focus: 'signin', users: 200, durationSec: 60, pattern: 'spike', signinPerMin: 4, pages: [] },
+  browse: { focus: 'browse', users: 200, durationSec: 90, pattern: 'steady', browserPerMin: 6 },
+  practice: { focus: 'practice', users: 100, durationSec: 90, pattern: 'steady', browserPerMin: 8, pages: ['practice', 'notebook', 'bookmarks', 'errors', 'stats'] },
+  staff: { focus: 'staff', users: 10, durationSec: 60, pattern: 'steady', staffPerMin: 8 },
+  mixed: { focus: 'mixed', users: 100, browsers: 100, staff: 5, staffPerMin: 4, signinPerMin: 1, durationSec: 120, pattern: 'steady', browserPerMin: 6, submitAtEnd: true, resultPct: 70 },
+};
+const PEOPLE = { exam: 'Students sitting the test', results: 'Students submitting', signin: 'People signing in', browse: 'People browsing', practice: 'People practising', staff: 'Staff using dashboards', mixed: 'Students sitting the test' };
 const SIZES = [25, 50, 100, 250, 500, 1000, 2500, 5000, 10000];
 const LENGTHS = [30, 60, 120, 300, 600, 1800, 3600];
 
@@ -150,27 +160,33 @@ function Setup({ info, d, form, set, setForm, onStart }) {
   }, [L.users, L.browsers, real.students, real.batches]);
   const picked = scen.find((x) => form.users === x.cfg.users && form.pattern === x.cfg.pattern && form.durationSec === x.cfg.durationSec)?.id;
   const shape = SHAPES.find((x) => x[0] === form.pattern);
+  const focus = form.focus || 'exam'; const examish = ['exam', 'results', 'mixed'].includes(focus); const maxPeople = focus === 'staff' ? Math.min(300, L.users[1]) : L.users[1];
+  const pickFocus = (k) => setForm((f) => ({ ...d.defaults, mockId: f.mockId, targets: f.targets, label: f.label, custom: [], ...FOCUS_CFG[k] }));
+  const total2 = examish ? (form.users || 0) + (form.browsers || 0) + (form.staff || 0) : (form.users || 0);
+  const pagesPick = (<div className="lx-pages"><span className="small"><b>Pages they open</b> (read-only)</span><div className="lx-chips wrap">{(d.pages || []).map(([k, l]) => <button key={k} type="button" className={pages.includes(k) ? 'on' : ''} aria-pressed={pages.includes(k)} onClick={() => togglePage(k)}>{l}</button>)}<button type="button" className="lx-all" onClick={() => set('pages', (d.pages || []).map((x) => x[0]))}>All</button><button type="button" className="lx-all" onClick={() => set('pages', [])}>None</button></div></div>);
   const est = pre?.est;
 
   return (
     <div className="lx-setup">
-      <div className="lx-top"><div><h3>Load test</h3><p className="muted">Send virtual students at this server and see where it bends. They sit a hidden copy of one of your mocks. Real students are not touched and everything is deleted afterwards.</p></div>
+      <div className="lx-top"><div><h3>Load test</h3><p className="muted">Send virtual people at this server and see where it bends. Pick what to test, say how many, and press start. Real students are not touched and everything the test creates is deleted afterwards.</p></div>
         <div className="lx-top-r"><button className="btn btn-ghost btn-sm" onClick={() => setShowLimits((x) => !x)} aria-expanded={showLimits}>Limits</button><button className="btn btn-ghost btn-sm" onClick={() => setForm({ ...d.defaults, mockId: form.mockId })}>Reset</button></div></div>
       {showLimits && <Limits info={info} onClose={() => setShowLimits(false)} onSaved={() => { setShowLimits(false); d.reload(); }} />}
 
-      <Section n="1" title="Choose a scenario" sub="A starting point. Everything below can still be changed.">
-        <div className="lx-scen" role="group" aria-label="Scenarios">{scen.map((x) => <button key={x.id} type="button" className={`lx-sc ${picked === x.id ? 'on' : ''}`} aria-pressed={picked === x.id} onClick={() => apply(x.cfg)}><span aria-hidden="true">{x.icon}</span><b>{x.name}</b><small>{x.text}</small></button>)}</div>
+      <Section n="1" title="What do you want to test?" sub="Pick the part of the site you are worried about.">
+        <div className="lx-focus" role="radiogroup" aria-label="What to test">{FOCUS.map(([k, icon, name, text]) => <button key={k} type="button" role="radio" aria-checked={focus === k} className={`lx-fc ${focus === k ? 'on' : ''}`} onClick={() => pickFocus(k)}><span aria-hidden="true">{icon}</span><b>{name}</b><small>{text}</small></button>)}</div>
+        {examish && <h4 className="lx-grp">Or start from a ready-made exam size</h4>}
+        {examish && <div className="lx-scen" role="group" aria-label="Scenarios">{scen.map((x) => <button key={x.id} type="button" className={`lx-sc ${picked === x.id ? 'on' : ''}`} aria-pressed={picked === x.id} onClick={() => apply({ ...x.cfg, focus })}><span aria-hidden="true">{x.icon}</span><b>{x.name}</b><small>{x.text}</small></button>)}</div>}
         {d.presets.filter((p) => !gonePre.includes(p.id)).length > 0 && <div className="lx-mine" role="group" aria-label="Your saved presets"><span className="muted small">Yours</span>{d.presets.filter((p) => !gonePre.includes(p.id)).map((p) => <span key={p.id} className="chip lt-mine"><button type="button" onClick={() => apply({ ...p.config })}><b>{p.name}</b> <span className="small">{fmtN(p.config.users)} students</span></button><button type="button" className="lt-x" aria-label={`Delete preset ${p.name}`} onClick={() => undoable({ msg: `Removed preset “${p.name}”`, hide: () => setGonePre((g) => [...g, p.id]), restore: () => setGonePre((g) => g.filter((i) => i !== p.id)), commit: async () => { await api.del(`/admin/loadtest/presets/${p.id}`); d.reload(); } })}>×</button></span>)}</div>}
       </Section>
 
       <Section n="2" title="How big and how long" right={<button className="lx-link" onClick={() => setShowLimits(true)}>Change limits</button>}>
         <div className="lx-grid">
-          <div className="ad-field lx-num"><span>Students sitting the test</span>
-            <input type="number" min={L.users[0]} max={L.users[1]} aria-label="Students" value={form.users ?? ''} aria-invalid={form.users > L.users[1] || undefined} onChange={(e) => set('users', e.target.value === '' ? null : Number(e.target.value))} onBlur={() => form.users != null && set('users', Math.min(L.users[1], Math.max(L.users[0], form.users)))} />
-            <div className="lx-chips">{SIZES.filter((x) => x <= L.users[1]).map((x) => <button key={x} type="button" className={form.users === x ? 'on' : ''} onClick={() => set('users', x)}>{fmtN(x)}</button>)}{!SIZES.includes(L.users[1]) && <button type="button" className={form.users === L.users[1] ? 'on' : ''} onClick={() => set('users', L.users[1])}>Max {fmtN(L.users[1])}</button>}</div>
+          <div className="ad-field lx-num"><span>{PEOPLE[focus]}</span>
+            <input type="number" min={L.users[0]} max={L.users[1]} aria-label="People" value={form.users ?? ''} aria-invalid={form.users > L.users[1] || undefined} onChange={(e) => set('users', e.target.value === '' ? null : Number(e.target.value))} onBlur={() => form.users != null && set('users', Math.min(L.users[1], Math.max(L.users[0], form.users)))} />
+            <div className="lx-chips">{SIZES.filter((x) => x <= maxPeople).map((x) => <button key={x} type="button" className={form.users === x ? 'on' : ''} onClick={() => set('users', x)}>{fmtN(x)}</button>)}{!SIZES.includes(L.users[1]) && <button type="button" className={form.users === L.users[1] ? 'on' : ''} onClick={() => set('users', L.users[1])}>Max {fmtN(L.users[1])}</button>}</div>
             {form.users > L.users[1] && <small className="sx-bad">Above your limit of {fmtN(L.users[1])}.</small>}</div>
           <Duration value={form.durationSec} onChange={(v) => set('durationSec', v)} lim={L.durationSec} />
-          <label className="ad-field lx-num">Mock to copy<select value={form.mockId} onChange={(e) => set('mockId', e.target.value)}>{info.mocks.map((m) => <option key={m.id} value={m.id}>{m.name} ({m.questions} questions)</option>)}</select><small className="muted">Its first section is what students answer.</small></label>
+          {examish && <label className="ad-field lx-num">Mock to copy<select value={form.mockId} onChange={(e) => set('mockId', e.target.value)}>{info.mocks.map((m) => <option key={m.id} value={m.id}>{m.name} ({m.questions} questions)</option>)}</select><small className="muted">Its first section is what students answer.</small></label>}
         </div>
         <div className="lx-field-l"><span>How do students arrive?</span>
           <div className="lx-seg" role="radiogroup" aria-label="Arrival pattern">{SHAPES.map(([k, n]) => <button key={k} type="button" role="radio" aria-checked={form.pattern === k} className={form.pattern === k ? 'on' : ''} onClick={() => set('pattern', k)}>{n}</button>)}</div>
@@ -179,7 +195,16 @@ function Setup({ info, d, form, set, setForm, onStart }) {
         </div>
       </Section>
 
-      <Section n="3" title="What students do" sub="Switch on what you want to test. Settings appear under each one.">
+      <Section n="3" title={examish ? 'What they do' : 'What the people do'} sub={examish ? 'The usual exam steps are on already. Open the fine-tuning below to change them.' : 'Settings for this kind of test.'}>
+        {(focus === 'signin' || focus === 'mixed') && <Row title="Sign in" desc="Everyone signs in the moment they arrive, then keeps signing in now and then. Signing in is the slowest thing the site does, on purpose." on={focus === 'signin' || form.signinPerMin > 0} locked={focus === 'signin'} onChange={flip('signinPerMin', 1)}><Num label="Repeat sign-ins per minute each" k="signinPerMin" form={form} set={set} lim={[focus === 'signin' ? 1 : 0, 30]} /></Row>}
+        {(focus === 'browse' || focus === 'practice') && <Row title="Open pages" desc="Each person opens one of the pages below, again and again." on locked><Num label="Page views per minute each" k="browserPerMin" form={form} set={set} lim={L.browserPerMin} /></Row>}
+        {(focus === 'browse' || focus === 'practice') && pagesPick}
+        {focus === 'mixed' && <Row title="People who only browse" desc="Dashboard, inbox, mock list: people using the site while others sit the test." on={form.browsers > 0} onChange={flip('browsers', 100)}><Num label="How many" k="browsers" form={form} set={set} lim={L.browsers} /><Num label="Page views per minute each" k="browserPerMin" form={form} set={set} lim={L.browserPerMin} /></Row>}
+        {focus === 'mixed' && form.browsers > 0 && pagesPick}
+        {focus === 'staff' && <Row title="Open admin pages" desc="Overview, users, attempts, analytics, live exams, question quality and alerts. Read-only." on locked><Num label="Page views per minute each" k="staffPerMin" form={form} set={set} lim={[1, 60]} /></Row>}
+        {focus === 'mixed' && <Row title="Staff on admin pages" desc="Teachers and admins checking dashboards during the exam." on={form.staff > 0} onChange={flip('staff', 5)}><Num label="How many" k="staff" form={form} set={set} lim={[0, 300]} /><Num label="Page views per minute each" k="staffPerMin" form={form} set={set} lim={[1, 60]} /></Row>}
+        <details className="lx-det lx-fine"><summary>{examish ? 'Fine-tune what students do' : 'Add requests of your own'}</summary>
+        {examish && <>
         <h4 className="lx-grp">During the test</h4>
         <Row title="Open the test" desc="Every student opens their test first." on locked />
         <Row title="Autosave answers" desc="The exam page saves answers on a timer. This is the main load." on locked>
@@ -198,6 +223,7 @@ function Setup({ info, d, form, set, setForm, onStart }) {
         <h4 className="lx-grp">Other people on the site</h4>
         <Row title="Students who only browse" desc="Dashboard, inbox, mock list: people using the site while others sit the test." on={form.browsers > 0} onChange={flip('browsers', 50)}><Num label="How many" k="browsers" form={form} set={set} lim={L.browsers} /><Num label="Page views per minute each" k="browserPerMin" form={form} set={set} lim={L.browserPerMin} /></Row>
         {(form.browsePerMin > 0 || form.browsers > 0) && <div className="lx-pages"><span className="small"><b>Pages they open</b> (read-only)</span><div className="lx-chips wrap">{(d.pages || []).map(([k, l]) => <button key={k} type="button" className={pages.includes(k) ? 'on' : ''} aria-pressed={pages.includes(k)} onClick={() => togglePage(k)}>{l}</button>)}<button type="button" className="lx-all" onClick={() => set('pages', (d.pages || []).map((x) => x[0]))}>All</button><button type="button" className="lx-all" onClick={() => set('pages', [])}>None</button></div></div>}
+        </>}
         <h4 className="lx-grp">Your own requests</h4>
         <details className="lx-det" open={custom.length > 0}><summary>{custom.length ? `${custom.length} custom request${custom.length > 1 ? 's' : ''}` : 'Add a request of your own'}</summary>
           <p className="small muted">Every virtual student is signed in. Use <code>{'{attempt}'}</code> for the student's test id and <code>{'{question}'}</code> for a question id. GET works on any student page. POST and PUT are limited to <code>/bookmarks</code>, <code>/notebook</code>, <code>/practice</code>, <code>{'/attempts/{attempt}/integrity'}</code> and <code>{'/attempts/{attempt}/errors/{question}'}</code>, and what they write is removed afterwards.</p>
@@ -212,13 +238,14 @@ function Setup({ info, d, form, set, setForm, onStart }) {
             </div>); })}
           {custom.length < (L.customMax || 12) ? <button type="button" className="btn btn-ghost btn-sm" onClick={() => set('custom', [...custom, { path: '', method: 'GET', body: '', perMin: 6 }])}>Add a request</button> : <small className="muted">You reached your limit of {L.customMax} requests.</small>}
         </details>
+        </details>
       </Section>
 
-      <Section n="4" title="What counts as a pass" sub="Optional. Set your own targets and the result is marked pass or fail.">
+      <details className="lx-det lx-sec lx-targets"><summary>Pass or fail targets <small className="muted">optional: mark the result against your own limits</small></summary>
         <Row title="Check this test against my targets" desc="Shown as a pass or fail list at the top of the result." on={!!tg.enabled} onChange={(on) => setTg('enabled', on)}>
           {TARGETS.map(([k, l, hnt]) => <label key={k} className="ad-field lx-num">{l}<input type="number" inputMode="numeric" value={tg[k] ?? ''} onChange={(e) => setTg(k, e.target.value === '' ? '' : Number(e.target.value))} />{hnt && <small className="muted">{hnt}</small>}</label>)}
         </Row>
-      </Section>
+      </details>
 
       <section className="lx-sec">
         <button type="button" className="lx-adv-t" aria-expanded={adv} onClick={() => setAdv(!adv)}><span>{adv ? '▾' : '▸'}</span> Advanced settings <small className="muted">timing, safety stop, warm-up, notes and presets</small></button>
@@ -240,17 +267,17 @@ function Setup({ info, d, form, set, setForm, onStart }) {
           </div>)}
       </section>
 
-      {!info.mocks.length && <p className="alert">There is no mock with at least 10 questions yet. Create one first.</p>}
+      {examish && !info.mocks.length && <p className="alert">There is no mock with at least 10 questions yet. Create one first.</p>}
       {info.maintenance !== 'off' && <p className="alert" role="status">Maintenance mode is on. Turn it off first or the virtual students are blocked.</p>}
       {pre?.blockers?.map((b2, i) => <p key={i} className="alert" role="alert"><b>Cannot start:</b> {b2}</p>)}
 
       <div className="lx-bar">
         <div className="lx-bar-t" role="status">
-          <b>{fmtN(total)} virtual students</b>{form.browsers ? <span className="muted"> ({fmtN(form.users)} testing, {fmtN(form.browsers)} browsing)</span> : null}
+          <b>{fmtN(total2)} virtual {examish ? 'students' : 'people'}</b>{examish && (form.browsers || form.staff) ? <span className="muted"> ({fmtN(form.users)} testing{form.browsers ? `, ${fmtN(form.browsers)} browsing` : ''}{form.staff ? `, ${fmtN(form.staff)} staff` : ''})</span> : null}
           <span className="muted"> · {lenText(form.durationSec || 0)}{est ? ` · about ${fmtN(est.requests)} requests (${fmtN(est.rps)}/s)` : ''}{est?.setupSec > 5 ? ` · ${Math.round(est.setupSec)}s setup` : ''}{est?.dbMB > 50 ? ` · +${fmtN(est.dbMB)} MB temporary data` : ''}</span>
           {pre?.warnings?.length > 0 && <button type="button" className="lx-warns" aria-expanded={notes} onClick={() => setNotes(!notes)}>⚠ {pre.warnings.length} note{pre.warnings.length > 1 ? 's' : ''}</button>}
         </div>
-        <button className="btn btn-primary" disabled={!info.mocks.length || info.maintenance !== 'off' || !form.users || !!pre?.blockers?.length} onClick={onStart}>Start the test</button>
+        <button className="btn btn-primary" disabled={(examish && !info.mocks.length) || info.maintenance !== 'off' || !form.users || !!pre?.blockers?.length} onClick={onStart}>Start the test</button>
         {notes && pre?.warnings?.length > 0 && <ul className="lx-notes">{pre.warnings.map((w, i) => <li key={i}>{w}</li>)}{est?.sharedCpuNote && <li className="muted">{est.sharedCpuNote}</li>}</ul>}
       </div>
     </div>
@@ -316,8 +343,8 @@ export default function LoadTest() {
       {view.name === 'list' && <Results baselineId={d.baselineId} h={hist} onOpen={openReport} onCompare={compare} onChanged={load} onRerunId={rerunId} />}
       {view.name === 'report' && <Report rep={view.rep} baselineId={d.baselineId} vs={view.vs} onBaseline={setBase} prevId={prev?.id} onAgain={() => setView({ name: 'new' })} onRerun={rerun} onCompare={compare} onChanged={() => { load(); openReport(view.id); }} />}
       {view.name === 'compare' && <Compare a={view.data.a} b={view.data.b} cmp={view.data} onBack={() => setView({ name: 'list' })} onSwap={() => compare(view.data.b.id, view.data.a.id)} />}
-      {dlg && <ConfirmModal title={`Run a ${lenText(form.durationSec)} test with ${fmtN(form.users + form.browsers)} students?`} word="start" label="Start test" busy={busy} error={e2} onClose={() => setDlg(false)} onConfirm={start}>
-        <p>The server will work hard for about {lenText(form.durationSec + 15)}. Pages may feel slower for anyone else using it. The virtual students and their data are removed when it ends, and the result is saved so you can compare it later.</p></ConfirmModal>}
+      {dlg && <ConfirmModal title={`Run a ${lenText(form.durationSec)} test with ${fmtN(['exam', 'results', 'mixed'].includes(form.focus || 'exam') ? form.users + (form.browsers || 0) + (form.staff || 0) : form.users)} ${['exam', 'results', 'mixed'].includes(form.focus || 'exam') ? 'students' : 'people'}?`} word="start" label="Start test" busy={busy} error={e2} onClose={() => setDlg(false)} onConfirm={start}>
+        <p>The server will work hard for about {lenText(form.durationSec + 15)}. Pages may feel slower for anyone else using it. The virtual accounts and their data are removed when it ends, and the result is saved so you can compare it later.</p></ConfirmModal>}
     </section>
   );
 }

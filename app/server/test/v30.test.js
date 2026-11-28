@@ -59,3 +59,37 @@ test('question scores: every measured question gets 0-100 with reasons, plus gra
   const mid = scoreOf({ flags: [{ key: 'no_explanation' }], pctRight: 55, disc: 0.15, n: 40, pctSkipped: 2 }); assert.equal(mid.grade, 'good'.replace('good', mid.score >= 80 ? 'good' : 'fair'));
   const r = await call('boss', 'GET', '/admin/quality?min=1'); assert.equal(r.status, 200); assert.ok('grades' in r.body && 'avgScore' in r.body && Array.isArray(r.body.mockScores));
 });
+
+test('load test: sign-in rush, browsing, and admin dashboards, each with a plain result', async () => {
+  await call('boss', 'POST', '/auth/register', { name: 'Boss LT', email: 'boss30lt@example.com', password: 'password123' });
+  db.prepare("UPDATE users SET role='admin' WHERE email='boss30lt@example.com'").run();
+  await call('boss', 'PUT', '/admin/abuse/config', { trusted: ['127.0.0.1', '::1'] });
+  const run = async (body) => {
+    const st = await call('boss', 'POST', '/admin/loadtest/start', { confirm: 'start', ...body }); assert.equal(st.status, 202, st.text);
+    let g; for (let n = 0; n < 120; n++) { await new Promise((r) => setTimeout(r, 400)); g = (await call('boss', 'GET', '/admin/loadtest')).body; if (['done', 'failed'].includes(g.run?.phase)) break; }
+    assert.equal(g.run.phase, 'done', g.run.error); return (await call('boss', 'GET', `/admin/loadtest/report/${g.history[0].id}`)).body.report;
+  };
+  // no mock is needed when nobody sits an exam
+  const a = await run({ focus: 'signin', users: 8, durationSec: 5, signinPerMin: 30 });
+  assert.equal(a.config.users, 0); assert.equal(a.people, 8); assert.ok(a.kinds.login.n >= 8, 'sign-ins were sent'); assert.equal(a.kinds.login.errors, 0, 'the per-IP sign-in limit does not block the test');
+  assert.ok(a.areas.some((x) => x.key === 'signin') && !a.areas.some((x) => x.key === 'save'), 'only tested areas are listed');
+  assert.ok(a.score >= 85 && a.scoreWhy.small && a.simple.note, 'a small clean test scores high but is flagged as small'); assert.equal(a.scoreV, 2);
+  assert.ok(a.simple.title && a.simple.numbers.length === 4 && Array.isArray(a.simple.fixes));
+  const b = await run({ focus: 'browse', users: 6, durationSec: 5, browserPerMin: 30, pages: ['me', 'mocks'] });
+  assert.ok(b.pages && b.pages.n > 0 && b.areas.some((x) => x.key === 'browse'));
+  const c = await run({ focus: 'staff', users: 3, durationSec: 5, staffPerMin: 30 });
+  assert.ok(c.admin && c.admin.n > 0, 'admin pages were opened'); assert.equal(c.totals.coreErrorPct, 0, 'virtual admins can open the dashboards');
+  assert.equal(db.prepare("SELECT COUNT(*) c FROM users WHERE email LIKE '%@loadtest.invalid'").get().c, 0, 'virtual accounts removed');
+  assert.equal(db.prepare("SELECT COUNT(*) c FROM sessions WHERE ua='loadtest'").get().c, 0);
+});
+
+test('load test score: one red or amber part caps it, and a clean run is not capped', async () => {
+  const { scoreDetail, areasOf, bandOf } = await import('../loadtest.js');
+  const mk = (save, errs = 0, extra = {}) => { const r = { config: { users: 100, browsers: 0, staff: 0, durationSec: 120 }, kinds: { save: { p95: save, p50: 50, n: 10 } }, peaks: { cpuProc: 30, memUsedPct: 40, writeMs: 10, lagMs: 20, diskUsedPct: 30 }, totals: { requests: 1000, errorPct: errs, coreErrorPct: errs, p95: save }, pages: null, admin: null, ...extra }; r.areas = areasOf(r); return scoreDetail(r); };
+  const fine = mk(100); assert.ok(fine.score >= 90 && fine.caps.length === 0 && fine.band === 'Excellent', JSON.stringify(fine));
+  const amber = mk(1200); assert.ok(amber.score <= 74 && amber.band === 'Shaky' && amber.caps.length === 1);
+  const red = mk(5000); assert.ok(red.score <= 49 && red.band === 'Poor');
+  const failing = mk(100, 8); assert.ok(failing.score <= 49, 'many failed requests make it poor even when the fast ones were fast');
+  const halted = mk(100, 0, { stopped: 'safety' }); assert.ok(halted.score <= 25);
+  assert.equal(bandOf(75), 'Good'); assert.equal(bandOf(74), 'Shaky');
+});

@@ -227,3 +227,11 @@ Live tests: choose Floor view (tiles that glow when a student needs a look) or T
 **What's new.** Server > Server tools > What's new: timeline, audience filters, search and copy buttons.
 
 **Edge button.** The lightning tab on the screen edge: drag to place, Alt+Q to open, 1 to 9 to pick, Customize for your own shortcuts. Saved per device.
+
+## v31: Load test redesign
+
+Server > Server tools > Load test. Step 1: pick what to test (live exam, sign-in rush, results rush, everyday browsing, practice pages, admin dashboards, or a busy day). Step 2: how many people and how long. Step 3: what they do. Targets and advanced settings are folded away. The result shows one verdict, four numbers, a card per tested part and up to three fixes; All the numbers holds the detail. Sign-in and admin tests use virtual accounts that are deleted afterwards.
+
+## v32: Readiness score
+
+The load test score is the average of the tested parts (waits and failures). Red caps it at 49, amber at 74, a server out of room at 74, a safety stop at 25. Bands: Excellent 90+, Good 75 to 89, Shaky 50 to 74, Poor under 50. Open How this score is worked out for each part's points.

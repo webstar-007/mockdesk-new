@@ -165,3 +165,10 @@ Load test v28: `GET/PUT /admin/loadtest/limits` (PUT `{reset:true}` restores def
 - Limited requests: 429 `{code:'RATE_LIMITED'}` with `Retry-After`. Blocked: 403 `{code:'BLOCKED'}`. `/admin/*` is counted, never throttled.
 - `GET /admin/quality?grade=good|fair|poor&sort=worst|score|best` adds `grades`, `avgScore`, `mockScores`, `sectionScores`; each question has `score`, `grade`, `scoreParts`, `disc`, `early`.
 - `GET /admin/server/info` returns `changelog` (latest 30 versions with tagged items) and `changelogTotal`.
+
+### v31 load test
+- `POST /admin/loadtest/start` accepts `focus`: `exam` (default), `results`, `signin`, `browse`, `practice`, `staff`, `mixed`. For `signin`, `browse`, `practice` and `staff`, `users` means people on the site and no mock is needed. New fields `signinPerMin`, `staff` (0 to 300) and `staffPerMin`.
+- Reports gain `focus`, `people`, `areas` (status card per tested part), `simple` (`level`, `title`, `text`, `room`, `numbers`, `fixes`) and `admin` (staff page timings). Kind `login` and kinds `staff:<path>` appear in `kinds`.
+
+### v32
+- Load test reports gain `scoreWhy` (`score`, `band`, `mean`, `caps`, `small`, `parts`) and `scoreV: 2`. `score` is the Readiness score (0 to 100). Older reports are rescored when read.

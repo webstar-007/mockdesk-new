@@ -161,7 +161,9 @@ export function createApp(db, { allowIncomplete = process.env.MOCKDESK_ALLOW_INC
   const api = express.Router();
   const signupBlock = (email) => { const c = controls(); if (c.maintenance.mode === 'hard') return 'The site is under maintenance. Please try again later.'; if (!c.signups.open) return c.signups.message || 'New sign-ups are closed right now.'; if (email && !emailAllowed(email, c)) return c.signups.message || `Sign-ups are limited to ${c.signups.domains.map((d) => '@' + d).join(', ')} email addresses.`; return ''; };
   const attempts = new Map(); // simple in-memory rate limit for auth
+  const ltKey = { token: '' }; // set only while an admin's load test runs; lets its virtual students past the per-IP sign-in limit
   const limited = (req, res) => {
+    if (ltKey.token && req.headers['x-loadtest'] === ltKey.token) return false;
     const k = req.ip; const t = now(); const a = (attempts.get(k) || []).filter((x) => t - x < 60000);
     a.push(t); attempts.set(k, a);
     if (a.length > 30) { res.status(429).json({ error: 'Too many attempts, try again in a minute' }); return true; }
@@ -662,7 +664,7 @@ export function createApp(db, { allowIncomplete = process.env.MOCKDESK_ALLOW_INC
   jobs.reg('backup', 'Database backup', 'every 10 min (runs when due)', () => { const b = runBackup({ db, now, settings }); return b ? `Saved ${b.name}` : 'Not due yet'; });
   jobs.reg('assignments', 'Assignment reminders', 'every 10 min', async () => `Sent ${await assign.run()} reminder(s)`);
   jobs.reg('cleanup', 'Tidy expired sign-ins and codes', 'every 10 min', () => { const t = now(); db.prepare('DELETE FROM sessions WHERE expires_at<?').run(t); db.prepare("DELETE FROM otps WHERE expires_at<? AND expires_at>0").run(t - 86400000); db.prepare('DELETE FROM login_log WHERE at<?').run(t - 90 * 86400000); });
-  api.use('/admin', (req, res, next) => (['admin', 'editor'].includes(req.user.role) ? next() : res.status(403).json({ error: 'Admin access only' })), adminRouter({ abuse, v24, tips, assign, exitFn, drafter, db, now, invalidate, getMock, readResult, hashPw, iso, settings, notifier, features, features2, exams, runReminders: runRem, mailer, jobs, metrics, controls, creds, live, otpSender, whatsapp }));
+  api.use('/admin', (req, res, next) => (['admin', 'editor'].includes(req.user.role) ? next() : res.status(403).json({ error: 'Admin access only' })), adminRouter({ ltKey, abuse, v24, tips, assign, exitFn, drafter, db, now, invalidate, getMock, readResult, hashPw, iso, settings, notifier, features, features2, exams, runReminders: runRem, mailer, jobs, metrics, controls, creds, live, otpSender, whatsapp }));
 
   api.use((req, res) => res.status(404).json({ error: 'Not found' }));
   app.use('/api', api);

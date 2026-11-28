@@ -9,10 +9,20 @@ export const TONE = { good: 'good', ok: 'good', warn: 'warn', bad: 'bad', info: 
 export const SHAPES = [['steady', 'Steady', 'Students join over a short spread and keep working. Like a normal exam start.'], ['spike', 'All at once', 'Everyone joins in the first second. Like a live mock where the link goes out at 10:00.'], ['ramp', 'Gradual climb', 'Students join one by one all through the test. Finds the point where the server starts to struggle.'], ['steps', 'Staircase', 'Students join in equal groups, with a pause between. Shows how the server does at each size, step by step.'], ['waves', 'Two waves', 'Most students join at the start and a second group arrives halfway. Like latecomers or a second batch.']];
 const SHAPE_NAME = Object.fromEntries(SHAPES.map(([k, n]) => [k, n]));
 export const shapeName = (k) => SHAPE_NAME[k || 'steady'];
-const KIND_NAMES = { open: 'Open the test', save: 'Autosave answers', poll: 'Check progress', submit: 'Submit the test', result: 'Open the result', review: 'Review page (4 calls each)', pdf: 'Download PDF report', section: 'Move to the next section', integrity: 'Tab-switch reports', home: 'Open the site home page' };
-export const kindLabel = (k) => KIND_NAMES[k] || (k.startsWith('page:') ? `Page ${k.slice(5)}` : k.startsWith('custom:') ? `Custom ${k.slice(7)}` : k);
+const KIND_NAMES = { open: 'Open the test', save: 'Autosave answers', poll: 'Check progress', submit: 'Submit the test', result: 'Open the result', review: 'Review page (4 calls each)', pdf: 'Download PDF report', section: 'Move to the next section', integrity: 'Tab-switch reports', home: 'Open the site home page', login: 'Sign in' };
+export const kindLabel = (k) => KIND_NAMES[k] || (k.startsWith('staff:') ? `Admin page ${k.slice(6)}` : k.startsWith('page:') ? `Page ${k.slice(5)}` : k.startsWith('custom:') ? `Custom ${k.slice(7)}` : k);
 export const kindOrder = (ks) => [...Object.keys(KIND_NAMES).filter((k) => ks.includes(k)), ...ks.filter((k) => !KIND_NAMES[k]).sort()];
-export const title = (x) => x.label || `${x.users} students, ${dt(x.at)}`;
+export const FOCUS = [
+  ['exam', '📝', 'Live exam', 'Students sit a mock: open it, autosave, submit and see the result.'],
+  ['signin', '🔑', 'Sign-in rush', 'Many students sign in at the same moment, like the minute before a live mock.'],
+  ['results', '📊', 'Results rush', 'Everyone submits and opens results, reviews and PDF reports together.'],
+  ['browse', '🧭', 'Everyday browsing', 'Students use the dashboard, mock list, inbox and stats. No exam running.'],
+  ['practice', '🎯', 'Practice and notebook', 'Students open practice, notebook, bookmarks and error log pages.'],
+  ['staff', '🛠️', 'Admin dashboards', 'Several staff open the heavy admin pages: overview, users, analytics, live.'],
+  ['mixed', '🌐', 'A busy day', 'A live exam, people browsing, sign-ins and staff, all at the same time.'],
+];
+export const focusName = (k) => FOCUS.find((x) => x[0] === (k || 'exam'))?.[2] || 'Live exam';
+export const title = (x) => x.label || `${focusName(x.focus)}, ${x.users} ${x.focus && x.focus !== 'exam' ? 'people' : 'students'}, ${dt(x.at)}`;
 
 /** Line chart. `lines` = [{data, key, color, name, dash}]. Optional vertical `marks` = [{t,label}]. */
 export function Chart({ title: ttl, lines, max, unit = '', fmt = (v) => Math.round(v), note, marks = [], legend }) {
@@ -51,9 +61,9 @@ export function Charts({ s, cpus, marks }) {
   );
 }
 
-export function ScoreRing({ score, level }) {
+export function ScoreRing({ score, level, band }) {
   const c = 2 * Math.PI * 34; const col = level === 'bad' ? 'var(--bad)' : level === 'warn' ? 'var(--warn)' : 'var(--good)';
-  return (<svg className="lt-ring" viewBox="0 0 80 80" role="img" aria-label={`Health score ${score} out of 100`}><circle cx="40" cy="40" r="34" fill="none" stroke="var(--line)" strokeWidth="8" /><circle cx="40" cy="40" r="34" fill="none" stroke={col} strokeWidth="8" strokeLinecap="round" strokeDasharray={`${(score / 100) * c} ${c}`} transform="rotate(-90 40 40)" /><text x="40" y="45" textAnchor="middle" className="lt-ring-n">{score}</text></svg>);
+  return (<div className="lt-score"><svg className="lt-ring" viewBox="0 0 80 80" role="img" aria-label={`Readiness score ${score} out of 100${band ? `, ${band}` : ''}`}><circle cx="40" cy="40" r="34" fill="none" stroke="var(--line)" strokeWidth="8" /><circle cx="40" cy="40" r="34" fill="none" stroke={col} strokeWidth="8" strokeLinecap="round" strokeDasharray={`${(c * Math.max(0, Math.min(100, score))) / 100} ${c}`} transform="rotate(-90 40 40)" /><text x="40" y="46" textAnchor="middle" fontSize="22" fontWeight="700" fill="currentColor">{score}</text></svg>{band && <b style={{ color: col }}>{band}</b>}<small className="muted">Readiness</small></div>);
 }
 
 export function LiveFeed({ events, live }) {
@@ -125,7 +135,7 @@ export function Trend({ h }) {
 
 /** "Will it handle N students?" using the numbers from this test. */
 function Planner({ rep }) {
-  const [n, setN] = useState(Math.max(rep.config.users * 2, 100)); const u = rep.config.users;
+  const u = rep.people ?? rep.config.users; const [n, setN] = useState(Math.max(u * 2, 100));
   const busy = (rep.samples || []).filter((x) => x.users >= Math.max(1, u * 0.5)); const avgCpu = busy.length ? busy.reduce((a, x) => a + x.cpuProc, 0) / busy.length : rep.peaks.cpuProc; const f = n / u; const cpu = Math.round(avgCpu * f); const base = rep.baseline?.rssMB || 0; const rss = Math.round(base + (rep.peaks.rssMB - base) * f); const mem = rep.peaks.memUsedPct + ((rss - rep.peaks.rssMB) / (rep.server.totalMem / MB)) * 100;
   const level = cpu >= 95 || mem >= 90 ? 'bad' : cpu >= 80 || mem >= 80 ? 'warn' : cpu >= 60 ? 'ok' : 'good';
   const words = { good: 'Should be comfortable.', ok: 'Should work, with little room to spare.', warn: 'Risky. Expect slow saves at the busiest moments.', bad: 'Likely to struggle. Test it for real before the exam.' }[level];
@@ -147,17 +157,19 @@ export function Report({ rep, onAgain, onRerun, onCompare, onChanged, prevId, ba
   const stamp = new Date(rep.at).toISOString().slice(0, 16).replace(':', '-'); const [edit, setEdit] = useState(false); const [label, setLabel] = useState(rep.label || ''); const [note, setNote] = useState(rep.note || '');
   const patch = async (b) => { try { await api.put(`/admin/loadtest/report/${rep.id}`, b); onChanged?.(); } catch (e) { toast(e.message, 'bad'); } };
   const bn = rep.bottleneck; const sc = rep.scorecard || [];
+  const sm = rep.simple || { level: v.level, title: v.title, text: v.text, room: '', fixes: rep.advice.slice(0, 3), numbers: [{ label: 'Students', value: rep.config.users }, { label: 'Requests handled', value: rep.totals.requests }, { label: 'Failed', value: `${rep.totals.errorPct}%` }, { label: 'Slowest typical wait', value: ms(rep.totals.p95) }] };
+  const areas = rep.areas || sc.map((c) => ({ key: c.key, icon: '', label: c.label, value: c.value, status: c.status, say: c.meaning }));
+  const people = rep.people ?? rep.config.users; const exam = !rep.focus || ['exam', 'results', 'mixed'].includes(rep.focus);
   return (
     <section>
-      <div className={`card lt-verdict t-${TONE[v.level]}`}>
-        <ScoreRing score={rep.score ?? 0} level={v.level} />
-        <div className="lt-vmain"><Badge tone={TONE[v.level]}>{v.title}</Badge>{rep.pinned && <Badge>Pinned</Badge>}{baselineId === rep.id && <Badge tone="good">Baseline</Badge>}
-          <h2>{rep.label ? `${rep.label}: ` : ''}{rep.config.users} students for {rep.config.durationSec} seconds</h2>
-          <p className="muted small" style={{ margin: '0 0 6px' }}>{dt(rep.at)} · {shapeName(rep.config.pattern)} · mock: {rep.server.mock}</p><p>{v.text}</p>
+      <div className={`card lt-verdict t-${TONE[sm.level]}`}>
+        <ScoreRing score={rep.score ?? 0} level={sm.level} band={rep.scoreWhy?.band} />
+        <div className="lt-vmain"><Badge tone={TONE[sm.level]}>{sm.title}</Badge>{rep.pinned && <Badge>Pinned</Badge>}{baselineId === rep.id && <Badge tone="good">Baseline</Badge>}
+          <h2>{rep.label ? `${rep.label}: ` : ''}{focusName(rep.focus)}: {people.toLocaleString()} {exam && rep.config.users ? 'students' : 'people'} for {rep.config.durationSec} seconds</h2>
+          <p className="muted small" style={{ margin: '0 0 6px' }}>{dt(rep.at)} · {shapeName(rep.config.pattern)}{rep.server.mock ? ` · mock: ${rep.server.mock}` : ''}</p>
+          <p className="lt-sum">{sm.text}</p>
+          {sm.room && <p className="small">{sm.room}</p>}
           {rep.stopped && <p className="small"><b>Stopped early:</b> {rep.stopReason}</p>}
-          {rep.measuredLimit ? <p className="small"><b>Measured limit:</b> {rep.measuredLimit.users > 0 ? `healthy up to ${rep.measuredLimit.users} students${rep.measuredLimit.atLeast ? ' (the highest tested, so the real limit is higher)' : ''}` : 'below the smallest group tested'}.</p>
-            : rep.estimate ? <p className="small">Rough ceiling on this server: <b>about {rep.estimate} students at once</b>. An estimate from how busy the app was, not a guarantee. Use "Gradual climb" for a measured limit.</p> : <p className="small">The app was barely busy, so the real limit is well above {rep.config.users}. Run again with more students, or use "Gradual climb", to find it.</p>}
-          {bn && <p className="small"><b>{bn.title}.</b> {bn.text}</p>}
           {rep.note && !edit && <p className="small muted">Note: {rep.note}</p>}
           {edit && <div className="lt-edit"><input aria-label="Name" placeholder="Name, for example Before Sunday exam" maxLength={60} value={label} onChange={(e) => setLabel(e.target.value)} /><input aria-label="Note" placeholder="Note (optional)" maxLength={300} value={note} onChange={(e) => setNote(e.target.value)} /><button className="btn btn-primary btn-sm" onClick={async () => { await patch({ label, note }); setEdit(false); }}>Save</button><button className="btn btn-ghost btn-sm" onClick={() => setEdit(false)}>Cancel</button></div>}
         </div>
@@ -165,16 +177,32 @@ export function Report({ rep, onAgain, onRerun, onCompare, onChanged, prevId, ba
           <button className="btn btn-primary" onClick={onAgain}>New test</button><button className="btn btn-ghost" onClick={() => onRerun(rep.config)}>Run again with the same settings</button>
           {prevId && <button className="btn btn-ghost" onClick={() => onCompare(prevId, rep.id)}>Compare with the test before</button>}
           {baselineId !== rep.id && <button className="btn btn-ghost" onClick={() => onBaseline?.(rep.id)}>Use as baseline</button>}
-          <button className="btn btn-ghost" onClick={() => setEdit(true)}>Name and note</button><button className="btn btn-ghost" onClick={() => patch({ pinned: !rep.pinned })}>{rep.pinned ? 'Unpin' : 'Pin (keep)'}</button>
-          <button className="btn btn-ghost" onClick={() => save(`load-test-${stamp}.json`, JSON.stringify(rep, null, 2), 'application/json')}>Download report</button><button className="btn btn-ghost" onClick={() => save(`load-test-${stamp}.csv`, csv(rep), 'text/csv')}>Download CSV</button>
+          <details className="lt-more"><summary className="btn btn-ghost">More</summary><div className="lt-more-b"><button className="btn btn-ghost" onClick={() => setEdit(true)}>Name and note</button><button className="btn btn-ghost" onClick={() => patch({ pinned: !rep.pinned })}>{rep.pinned ? 'Unpin' : 'Pin (keep)'}</button>
+          <button className="btn btn-ghost" onClick={() => save(`load-test-${stamp}.json`, JSON.stringify(rep, null, 2), 'application/json')}>Download report</button><button className="btn btn-ghost" onClick={() => save(`load-test-${stamp}.csv`, csv(rep), 'text/csv')}>Download CSV</button></div></details>
         </div>
       </div>
+
+      {sm.note && <p className="lt-note small">{sm.note}</p>}
+      {rep.scoreWhy && <details className="lt-why"><summary>How this score is worked out</summary>
+        <p>The score is the average of the parts that were tested ({rep.scoreWhy.mean}). A part scores 100 when it is instant, about 85 at the edge of good, 70 at the edge of fine, and falls quickly after that.{rep.scoreWhy.caps.length ? ` It is held down to ${Math.min(...rep.scoreWhy.caps.map((x) => x.at))} because ${rep.scoreWhy.caps.map((x) => x.why).join(' and ')}.` : ' Nothing held it back.'}</p>
+        <ul>{rep.scoreWhy.parts.map((x) => <li key={x.key}><span className={`lt-pt s-${x.status}`} aria-hidden="true" />{x.label}<b>{x.pts}</b></li>)}</ul>
+        <p className="muted small">90 and above is Excellent, 75 to 89 Good, 50 to 74 Shaky, under 50 Poor. The server's own health (processor, memory, disk) is shown below but only lowers the score when it ran out of room.</p></details>}
+
+      <div className="lt-nums">{sm.numbers.map((n) => <div key={n.label}><strong>{n.value}</strong><span>{n.label}</span></div>)}</div>
+
+      <h3 className="lt-h">How each part did</h3>
+      <div className="lt-areas">{areas.map((c) => <div key={c.key} className={`lt-area s-${c.status}`}><div className="lt-area-h"><span aria-hidden="true">{c.icon}</span><b>{c.label}</b><i className="lt-dot" aria-hidden="true" /></div><strong>{c.value}</strong><small>{c.say}</small></div>)}</div>
+
+      {sm.fixes.length > 0 && <section className="card lt-todo"><h3>{sm.level === 'good' ? 'Worth knowing' : 'What to do about it'}</h3><ol>{sm.fixes.map((f, i) => <li key={i}>{f}</li>)}</ol></section>}
 
       {vs && <section className={`card lx-vs t-${vs.worse > vs.better ? 'bad' : vs.better > vs.worse ? 'good' : 'warn'}`} style={{ marginTop: 12 }}>
         <div className="lx-vs-h"><h3>Against your baseline</h3><span className="muted small">{vs.label || 'Baseline'} · {dt(vs.at)}</span>{onCompare && <button className="btn btn-ghost btn-sm" onClick={() => onCompare(vs.id, rep.id)}>Full comparison</button>}</div>
         <p><b>{vs.headline}</b></p>{vs.caution && <p className="small muted">{vs.caution}</p>}
         <ul className="lx-vs-l">{vs.rows.filter((r) => r.verdict !== 'same' && r.delta != null).slice(0, 6).map((r) => <li key={r.key} className={`c-${r.verdict}`}><span>{r.label}</span><b>{val(r.a, r.unit)} → {val(r.b, r.unit)}</b></li>)}</ul></section>}
 
+      {rep.samples && rep.samples.length > 2 && <div className="lt-one"><Chart title="Wait time (ms)" lines={[{ data: rep.samples, key: 'p95', color: 'var(--bad)', name: 'p95' }]} marks={rep.marks} note="How long the slower waits took. A line that climbs means people are waiting longer." /><Chart title="People active" lines={[{ data: rep.samples, key: 'users', color: 'var(--brand)', name: 'People' }]} marks={rep.marks} note="Compare with the wait-time chart: the point where waiting climbs is where the server starts to struggle." /></div>}
+
+      <details className="card lt-all"><summary><b>All the numbers</b> <small className="muted">the full detail, if you want it</small></summary>
       {rep.plain?.length > 0 && <section className="card" style={{ marginTop: 12 }}><h3 style={{ marginTop: 0 }}>In plain words</h3><ul className="lt-advice">{rep.plain.map((p, i) => <li key={i}>{p}</li>)}</ul></section>}
 
       {sc.length > 0 && <div className="lt-sc" style={{ marginTop: 12 }}>{sc.map((c) => <div key={c.key} className={`lt-sc-i t-${TONE[c.status]} s-${c.status}`}><div><span className="lt-dot" aria-hidden="true" /><b>{c.label}</b></div><strong>{c.value}</strong><small>{c.meaning}</small></div>)}</div>}
@@ -210,6 +238,7 @@ export function Report({ rep, onAgain, onRerun, onCompare, onChanged, prevId, ba
       <div style={{ marginTop: 12 }}><Planner rep={rep} /></div>
       <div style={{ marginTop: 12 }}><Feed events={rep.events} /></div>
       {rep.samples && <Charts s={rep.samples} cpus={rep.server.cpus} marks={rep.marks} />}
+      </details>
     </section>
   );
 }
